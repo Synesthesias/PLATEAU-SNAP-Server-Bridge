@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS citydb.images (
   to_longitude double precision NOT NULL,
   to_altitude double precision NOT NULL,
   roll double precision NOT NULL,
+  exterior real[] NOT NULL,
   timestamp timestamp  NOT NULL DEFAULT current_timestamp
 );
 

@@ -23,6 +23,8 @@ public partial class Image
 
     public double Roll { get; set; }
 
+    public List<float> Exterior { get; set; } = null!;
+
     public DateTime Timestamp { get; set; }
 
     public virtual ICollection<ImageSurfaceRelation> ImageSurfaceRelations { get; set; } = new List<ImageSurfaceRelation>();

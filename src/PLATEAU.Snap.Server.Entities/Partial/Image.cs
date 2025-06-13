@@ -17,6 +17,7 @@ public partial class Image
         ToLongitude = metadata.To.Longitude;
         ToAltitude = metadata.To.Altitude;
         Roll = metadata.Roll;
+        Exterior = metadata.Exterior;
         Timestamp = metadata.Timestamp;
         ImageSurfaceRelations.Add(new ImageSurfaceRelation { Gmlid = metadata.Gmlid });
     }

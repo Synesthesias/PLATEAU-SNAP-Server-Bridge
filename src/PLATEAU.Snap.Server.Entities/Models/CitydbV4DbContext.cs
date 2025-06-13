@@ -84,6 +84,7 @@ public partial class CitydbV4DbContext : DbContext
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("nextval('images_id_seq'::regclass)")
                 .HasColumnName("id");
+            entity.Property(e => e.Exterior).HasColumnName("exterior");
             entity.Property(e => e.FromAltitude).HasColumnName("from_altitude");
             entity.Property(e => e.FromLatitude).HasColumnName("from_latitude");
             entity.Property(e => e.FromLongitude).HasColumnName("from_longitude");

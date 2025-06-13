@@ -135,6 +135,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// CORS
+builder.Services.AddCors(options =>
+ {
+     options.AddDefaultPolicy(builder =>
+     {
+         builder.AllowAnyOrigin()
+             .AllowAnyMethod()
+             .AllowAnyHeader();
+     });
+ });
+
 // Logging
 builder.Logging.AddSimpleConsole(options =>
 {
@@ -153,6 +164,7 @@ if (isDevelopment)
 app.UseHttpLogging();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
