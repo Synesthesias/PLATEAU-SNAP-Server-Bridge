@@ -7,11 +7,6 @@ namespace PLATEAU.Snap.Server.Entities;
 
 public partial class CitydbV4DbContext : DbContext
 {
-    static CitydbV4DbContext()
-    {
-        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-    }
-
     public CitydbV4DbContext()
     {
     }
@@ -21,7 +16,11 @@ public partial class CitydbV4DbContext : DbContext
     {
     }
 
+    public virtual DbSet<Building> Buildings { get; set; }
+
     public virtual DbSet<CityBoundary> CityBoundaries { get; set; }
+
+    public virtual DbSet<Cityobject> Cityobjects { get; set; }
 
     public virtual DbSet<Image> Images { get; set; }
 
@@ -34,6 +33,192 @@ public partial class CitydbV4DbContext : DbContext
         modelBuilder
             .HasPostgresExtension("postgis")
             .HasPostgresExtension("postgis_raster");
+
+        modelBuilder.Entity<Building>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("building_pk");
+
+            entity.ToTable("building", "citydb");
+
+            entity.HasIndex(e => e.Lod0FootprintId, "building_lod0footprint_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod0RoofprintId, "building_lod0roofprint_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod1MultiSurfaceId, "building_lod1msrf_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod1SolidId, "building_lod1solid_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod1TerrainIntersection, "building_lod1terr_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.Lod2MultiCurve, "building_lod2curve_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.Lod2MultiSurfaceId, "building_lod2msrf_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod2SolidId, "building_lod2solid_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod2TerrainIntersection, "building_lod2terr_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.Lod3MultiCurve, "building_lod3curve_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.Lod3MultiSurfaceId, "building_lod3msrf_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod3SolidId, "building_lod3solid_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod3TerrainIntersection, "building_lod3terr_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.Lod4MultiCurve, "building_lod4curve_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.Lod4MultiSurfaceId, "building_lod4msrf_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod4SolidId, "building_lod4solid_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lod4TerrainIntersection, "building_lod4terr_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.ObjectclassId, "building_objectclass_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.BuildingParentId, "building_parent_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.BuildingRootId, "building_root_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedNever()
+                .HasColumnName("id");
+            entity.Property(e => e.BuildingParentId).HasColumnName("building_parent_id");
+            entity.Property(e => e.BuildingRootId).HasColumnName("building_root_id");
+            entity.Property(e => e.Class)
+                .HasMaxLength(256)
+                .HasColumnName("class");
+            entity.Property(e => e.ClassCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("class_codespace");
+            entity.Property(e => e.Function)
+                .HasMaxLength(1000)
+                .HasColumnName("function");
+            entity.Property(e => e.FunctionCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("function_codespace");
+            entity.Property(e => e.Lod0FootprintId).HasColumnName("lod0_footprint_id");
+            entity.Property(e => e.Lod0RoofprintId).HasColumnName("lod0_roofprint_id");
+            entity.Property(e => e.Lod1MultiSurfaceId).HasColumnName("lod1_multi_surface_id");
+            entity.Property(e => e.Lod1SolidId).HasColumnName("lod1_solid_id");
+            entity.Property(e => e.Lod1TerrainIntersection)
+                .HasColumnType("geometry(MultiLineStringZ,6697)")
+                .HasColumnName("lod1_terrain_intersection");
+            entity.Property(e => e.Lod2MultiCurve)
+                .HasColumnType("geometry(MultiLineStringZ,6697)")
+                .HasColumnName("lod2_multi_curve");
+            entity.Property(e => e.Lod2MultiSurfaceId).HasColumnName("lod2_multi_surface_id");
+            entity.Property(e => e.Lod2SolidId).HasColumnName("lod2_solid_id");
+            entity.Property(e => e.Lod2TerrainIntersection)
+                .HasColumnType("geometry(MultiLineStringZ,6697)")
+                .HasColumnName("lod2_terrain_intersection");
+            entity.Property(e => e.Lod3MultiCurve)
+                .HasColumnType("geometry(MultiLineStringZ,6697)")
+                .HasColumnName("lod3_multi_curve");
+            entity.Property(e => e.Lod3MultiSurfaceId).HasColumnName("lod3_multi_surface_id");
+            entity.Property(e => e.Lod3SolidId).HasColumnName("lod3_solid_id");
+            entity.Property(e => e.Lod3TerrainIntersection)
+                .HasColumnType("geometry(MultiLineStringZ,6697)")
+                .HasColumnName("lod3_terrain_intersection");
+            entity.Property(e => e.Lod4MultiCurve)
+                .HasColumnType("geometry(MultiLineStringZ,6697)")
+                .HasColumnName("lod4_multi_curve");
+            entity.Property(e => e.Lod4MultiSurfaceId).HasColumnName("lod4_multi_surface_id");
+            entity.Property(e => e.Lod4SolidId).HasColumnName("lod4_solid_id");
+            entity.Property(e => e.Lod4TerrainIntersection)
+                .HasColumnType("geometry(MultiLineStringZ,6697)")
+                .HasColumnName("lod4_terrain_intersection");
+            entity.Property(e => e.MeasuredHeight).HasColumnName("measured_height");
+            entity.Property(e => e.MeasuredHeightUnit)
+                .HasMaxLength(4000)
+                .HasColumnName("measured_height_unit");
+            entity.Property(e => e.ObjectclassId).HasColumnName("objectclass_id");
+            entity.Property(e => e.RoofType)
+                .HasMaxLength(256)
+                .HasColumnName("roof_type");
+            entity.Property(e => e.RoofTypeCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("roof_type_codespace");
+            entity.Property(e => e.StoreyHeightsAboveGround)
+                .HasMaxLength(4000)
+                .HasColumnName("storey_heights_above_ground");
+            entity.Property(e => e.StoreyHeightsAgUnit)
+                .HasMaxLength(4000)
+                .HasColumnName("storey_heights_ag_unit");
+            entity.Property(e => e.StoreyHeightsBelowGround)
+                .HasMaxLength(4000)
+                .HasColumnName("storey_heights_below_ground");
+            entity.Property(e => e.StoreyHeightsBgUnit)
+                .HasMaxLength(4000)
+                .HasColumnName("storey_heights_bg_unit");
+            entity.Property(e => e.StoreysAboveGround)
+                .HasPrecision(8)
+                .HasColumnName("storeys_above_ground");
+            entity.Property(e => e.StoreysBelowGround)
+                .HasPrecision(8)
+                .HasColumnName("storeys_below_ground");
+            entity.Property(e => e.Usage)
+                .HasMaxLength(1000)
+                .HasColumnName("usage");
+            entity.Property(e => e.UsageCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("usage_codespace");
+            entity.Property(e => e.YearOfConstruction).HasColumnName("year_of_construction");
+            entity.Property(e => e.YearOfDemolition).HasColumnName("year_of_demolition");
+
+            entity.HasOne(d => d.BuildingParent).WithMany(p => p.InverseBuildingParent)
+                .HasForeignKey(d => d.BuildingParentId)
+                .HasConstraintName("building_parent_fk");
+
+            entity.HasOne(d => d.BuildingRoot).WithMany(p => p.InverseBuildingRoot)
+                .HasForeignKey(d => d.BuildingRootId)
+                .HasConstraintName("building_root_fk");
+
+            entity.HasOne(d => d.IdNavigation).WithOne(p => p.Building)
+                .HasForeignKey<Building>(d => d.Id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("building_cityobject_fk");
+
+            entity.HasOne(d => d.Lod0Footprint).WithMany(p => p.BuildingLod0Footprints)
+                .HasForeignKey(d => d.Lod0FootprintId)
+                .HasConstraintName("building_lod0footprint_fk");
+
+            entity.HasOne(d => d.Lod0Roofprint).WithMany(p => p.BuildingLod0Roofprints)
+                .HasForeignKey(d => d.Lod0RoofprintId)
+                .HasConstraintName("building_lod0roofprint_fk");
+
+            entity.HasOne(d => d.Lod1MultiSurface).WithMany(p => p.BuildingLod1MultiSurfaces)
+                .HasForeignKey(d => d.Lod1MultiSurfaceId)
+                .HasConstraintName("building_lod1msrf_fk");
+
+            entity.HasOne(d => d.Lod1Solid).WithMany(p => p.BuildingLod1Solids)
+                .HasForeignKey(d => d.Lod1SolidId)
+                .HasConstraintName("building_lod1solid_fk");
+
+            entity.HasOne(d => d.Lod2MultiSurface).WithMany(p => p.BuildingLod2MultiSurfaces)
+                .HasForeignKey(d => d.Lod2MultiSurfaceId)
+                .HasConstraintName("building_lod2msrf_fk");
+
+            entity.HasOne(d => d.Lod2Solid).WithMany(p => p.BuildingLod2Solids)
+                .HasForeignKey(d => d.Lod2SolidId)
+                .HasConstraintName("building_lod2solid_fk");
+
+            entity.HasOne(d => d.Lod3MultiSurface).WithMany(p => p.BuildingLod3MultiSurfaces)
+                .HasForeignKey(d => d.Lod3MultiSurfaceId)
+                .HasConstraintName("building_lod3msrf_fk");
+
+            entity.HasOne(d => d.Lod3Solid).WithMany(p => p.BuildingLod3Solids)
+                .HasForeignKey(d => d.Lod3SolidId)
+                .HasConstraintName("building_lod3solid_fk");
+
+            entity.HasOne(d => d.Lod4MultiSurface).WithMany(p => p.BuildingLod4MultiSurfaces)
+                .HasForeignKey(d => d.Lod4MultiSurfaceId)
+                .HasConstraintName("building_lod4msrf_fk");
+
+            entity.HasOne(d => d.Lod4Solid).WithMany(p => p.BuildingLod4Solids)
+                .HasForeignKey(d => d.Lod4SolidId)
+                .HasConstraintName("building_lod4solid_fk");
+        });
 
         modelBuilder.Entity<CityBoundary>(entity =>
         {
@@ -75,6 +260,69 @@ public partial class CitydbV4DbContext : DbContext
             entity.Property(e => e.YCode).HasColumnName("y_code");
         });
 
+        modelBuilder.Entity<Cityobject>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("cityobject_pk");
+
+            entity.ToTable("cityobject", "citydb");
+
+            entity.HasIndex(e => e.CreationDate, "cityobj_creation_date_inx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.LastModificationDate, "cityobj_last_mod_date_inx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.TerminationDate, "cityobj_term_date_inx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Envelope, "cityobject_envelope_spx").HasMethod("gist");
+
+            entity.HasIndex(e => new { e.Gmlid, e.GmlidCodespace }, "cityobject_inx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Lineage, "cityobject_lineage_inx");
+
+            entity.HasIndex(e => e.ObjectclassId, "cityobject_objectclass_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('cityobject_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.CreationDate).HasColumnName("creation_date");
+            entity.Property(e => e.Description)
+                .HasMaxLength(4000)
+                .HasColumnName("description");
+            entity.Property(e => e.Envelope)
+                .HasColumnType("geometry(PolygonZ,6697)")
+                .HasColumnName("envelope");
+            entity.Property(e => e.Gmlid)
+                .HasMaxLength(256)
+                .HasColumnName("gmlid");
+            entity.Property(e => e.GmlidCodespace)
+                .HasMaxLength(1000)
+                .HasColumnName("gmlid_codespace");
+            entity.Property(e => e.LastModificationDate).HasColumnName("last_modification_date");
+            entity.Property(e => e.Lineage)
+                .HasMaxLength(256)
+                .HasColumnName("lineage");
+            entity.Property(e => e.Name)
+                .HasMaxLength(1000)
+                .HasColumnName("name");
+            entity.Property(e => e.NameCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("name_codespace");
+            entity.Property(e => e.ObjectclassId).HasColumnName("objectclass_id");
+            entity.Property(e => e.ReasonForUpdate)
+                .HasMaxLength(4000)
+                .HasColumnName("reason_for_update");
+            entity.Property(e => e.RelativeToTerrain)
+                .HasMaxLength(256)
+                .HasColumnName("relative_to_terrain");
+            entity.Property(e => e.RelativeToWater)
+                .HasMaxLength(256)
+                .HasColumnName("relative_to_water");
+            entity.Property(e => e.TerminationDate).HasColumnName("termination_date");
+            entity.Property(e => e.UpdatingPerson)
+                .HasMaxLength(256)
+                .HasColumnName("updating_person");
+            entity.Property(e => e.XmlSource).HasColumnName("xml_source");
+        });
+
         modelBuilder.Entity<Image>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("images_pkey");
@@ -89,9 +337,9 @@ public partial class CitydbV4DbContext : DbContext
             entity.Property(e => e.FromLatitude).HasColumnName("from_latitude");
             entity.Property(e => e.FromLongitude).HasColumnName("from_longitude");
             entity.Property(e => e.Roll).HasColumnName("roll");
+            entity.Property(e => e.Thumbnail).HasColumnName("thumbnail");
             entity.Property(e => e.Timestamp)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("timestamp without time zone")
                 .HasColumnName("timestamp");
             entity.Property(e => e.ToAltitude).HasColumnName("to_altitude");
             entity.Property(e => e.ToLatitude).HasColumnName("to_latitude");
@@ -162,6 +410,10 @@ public partial class CitydbV4DbContext : DbContext
             entity.Property(e => e.IsXlink).HasColumnName("is_xlink");
             entity.Property(e => e.ParentId).HasColumnName("parent_id");
             entity.Property(e => e.RootId).HasColumnName("root_id");
+
+            entity.HasOne(d => d.Cityobject).WithMany(p => p.SurfaceGeometries)
+                .HasForeignKey(d => d.CityobjectId)
+                .HasConstraintName("surface_geom_cityobj_fk");
 
             entity.HasOne(d => d.Parent).WithMany(p => p.InverseParent)
                 .HasForeignKey(d => d.ParentId)

@@ -1,8 +1,9 @@
-﻿using PLATEAU.Snap.Models.Server;
+﻿using PLATEAU.Snap.Models.Common;
+using PLATEAU.Snap.Models.Server;
 
 namespace PLATEAU.Snap.Server.Services;
 
 public interface ISurfaceGeometryService
 {
-    public Task<Models.Client.VisibleSurfacesResponse> GetVisibleSurfacesAsync(VisibleSurfacesRequest request);
+    Task<Models.Client.VisibleSurfacesResponse> GetVisibleSurfacesAsync(VisibleSurfacesRequest request);
 }

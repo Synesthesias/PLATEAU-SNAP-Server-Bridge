@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PLATEAU.Snap.Models.Client;
+using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Server.Extensions.Mvc;
 using PLATEAU.Snap.Server.Services;
 using Swashbuckle.AspNetCore.Annotations;
@@ -52,6 +53,33 @@ public class ImagesController : ControllerBase
         catch (Exception ex)
         {
             logger.LogError(ex, $"{DateTime.Now}: Failed to create building image");
+            return this.HandleException(ex);
+        }
+    }
+
+    [HttpGet]
+    [Route("building-images")]
+    [SwaggerOperation(
+        Summary = "テクスチャを更新できる建築物モデル情報を取得します。",
+        OperationId = nameof(GetBuildingImagesAsync)
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, SwaggerResponseDescriptions.Ok, typeof(PageData<BuildingImage>))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, SwaggerResponseDescriptions.BadRequest)]
+    [SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
+    [SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
+    public async Task<ActionResult<PageData<BuildingImage>>> GetBuildingImagesAsync(
+        [FromQuery, SwaggerParameter("ソート順")] SortType sortType = SortType.IdAsc,
+        [FromQuery, SwaggerParameter("ページ番号")] int pageNumber = 1,
+        [FromQuery, SwaggerParameter("ページサイズ")] int pageSize = 10)
+    {
+        try
+        {
+            logger.LogInformation($"{DateTime.Now}: {sortType}, {pageNumber}, {pageSize}");
+            return Ok(await service.GetBuildingImagesAsync(sortType, pageNumber, pageSize));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"{DateTime.Now}: Failed to get visible surfaces");
             return this.HandleException(ex);
         }
     }

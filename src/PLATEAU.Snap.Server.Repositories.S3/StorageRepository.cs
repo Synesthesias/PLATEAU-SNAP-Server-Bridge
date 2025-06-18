@@ -1,4 +1,5 @@
 ﻿using Amazon.S3;
+using Amazon.S3.Model;
 using Amazon.S3.Transfer;
 using PLATEAU.Snap.Models.Server;
 using System.Net;
@@ -50,5 +51,18 @@ internal class StorageRepository : IStorageRepository
                     return new StorageUploadResponse(HttpStatusCode.InternalServerError);
             }
         }
+    }
+
+    public async Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes)
+    {
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = this.s3Settings.Bucket,
+            Key = objectKey,
+            Expires = DateTime.UtcNow.AddMinutes(expiryInMinutes),
+            Verb = HttpVerb.GET
+        };
+
+        return await amazonS3.GetPreSignedURLAsync(request);
     }
 }

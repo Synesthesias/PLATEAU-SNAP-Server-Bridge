@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Extensions.Geometries;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Entities;
@@ -104,5 +105,73 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         var to = await reader.GetFieldValueAsync<Point>(1);
 
         return new CameraInfo(from.Coordinate, to.Coordinate);
+    }
+
+    public async Task<PageList<BuildingImage>> GetBuildingImagesAsync(SortType sortType, int pageNumber, int pageSize)
+    {
+        var connection = Context.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        using var countCommand = connection.CreateCommand();
+        countCommand.CommandText = @"
+            WITH t AS(
+              SELECT distinct b.id AS building_id, sg.gmlid FROM images AS i
+              JOIN image_surface_relations AS r ON i.id=r.image_id
+              JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
+              JOIN surface_centroid AS sc ON sg.id=sc.id
+              JOIN building AS b ON sg.root_id=b.lod2_solid_id
+            )
+            SELECT count(*) FROM t";
+
+#pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
+        var count = (long)await countCommand.ExecuteScalarAsync();
+#pragma warning restore CS8605 // null の可能性がある値をボックス化解除しています。
+
+        if (count == 0)
+        {
+            return new PageList<BuildingImage>(new List<BuildingImage>(), 0, pageNumber, pageSize);
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @$"
+            WITH t AS (
+              SELECT b.id AS building_id, sg.gmlid, i.thumbnail, sc.center FROM images AS i
+              JOIN image_surface_relations AS r ON i.id=r.image_id
+              JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
+              JOIN surface_centroid AS sc ON sg.id=sc.id
+              JOIN building AS b ON sg.root_id=b.lod2_solid_id
+            )
+            SELECT
+              distinct 
+              building_id,
+              gmlid,
+              thumbnail,
+              CASE WHEN ken_name IS NOT NULL THEN ken_name ELSE '' END ||
+              CASE WHEN sityo_name IS NOT NULL THEN sityo_name ELSE '' END ||
+              CASE WHEN gst_name IS NOT NULL THEN gst_name ELSE '' END ||
+              CASE WHEN css_name IS NOT NULL THEN css_name ELSE '' END ||
+              CASE WHEN moji IS NOT NULL THEN moji ELSE '' END AS address
+            FROM t
+            LEFT OUTER JOIN town_boundary AS tb ON ST_Intersects(center, tb.geom)
+            ORDER BY building_id {(sortType == SortType.IdAsc ? "ASC" : "DESC")}
+            LIMIT @limit OFFSET @offset";
+        command.Parameters.Add(command.CreateParameter("@limit", pageSize));
+        command.Parameters.Add(command.CreateParameter("@offset", (pageNumber - 1) * pageSize));
+
+        var list = new List<BuildingImage>();
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var id = reader.GetInt32(0);
+            var gmlId = reader.GetString(1);
+            var thumbnail = await reader.IsDBNullAsync(2) ? null : await reader.GetFieldValueAsync<byte[]>(2);
+            var address = await reader.IsDBNullAsync(3) ? null : reader.GetString(3);
+            list.Add(new BuildingImage(id, gmlId, thumbnail, address));
+        }
+
+        return new PageList<BuildingImage>(list, (int)count, pageNumber, pageSize);
     }
 }

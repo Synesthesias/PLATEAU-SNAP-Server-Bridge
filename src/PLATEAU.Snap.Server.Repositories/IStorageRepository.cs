@@ -5,4 +5,6 @@ namespace PLATEAU.Snap.Server.Repositories;
 public interface IStorageRepository
 {
     Task<StorageUploadResponse> UploadAsync(Stream stream, string path);
+
+    Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes);
 }
