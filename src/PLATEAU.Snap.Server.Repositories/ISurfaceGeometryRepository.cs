@@ -9,5 +9,7 @@ public interface ISurfaceGeometryRepository
 
     Task<CameraInfo> GetCameraInfoAsync(VisibleSurfacesRequest request, int srid);
 
-    Task<PageList<BuildingImage>> GetBuildingImagesAsync(SortType sortType, int pageNumber, int pageSize);
+    Task<PageList<BuildingImage>> GetBuildingsAsync(SortType sortType, int pageNumber, int pageSize);
+
+    Task<PageList<FaceImage>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize);
 }

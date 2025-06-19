@@ -10,6 +10,7 @@ using Npgsql;
 using PLATEAU.Snap.Server;
 using PLATEAU.Snap.Server.Entities;
 using PLATEAU.Snap.Server.Extensions.DependencyInjection;
+using PLATEAU.Snap.Server.Filters;
 using PLATEAU.Snap.Server.Geoid;
 using PLATEAU.Snap.Server.Repositories;
 using PLATEAU.Snap.Server.Services;
@@ -76,6 +77,7 @@ builder.Services.UseS3Repositories();
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add(new ProducesAttribute("application/json"));
+    options.Filters.Add<ApiExceptionFilter>();
 }).AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;

@@ -1,4 +1,5 @@
-﻿using PLATEAU.Snap.Models.Extensions.Numerics;
+﻿using PLATEAU.Snap.Models.Common;
+using PLATEAU.Snap.Models.Extensions.Numerics;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Geoid;
 using PLATEAU.Snap.Server.Repositories;
@@ -49,6 +50,18 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
         response.Surfaces.AddRange(facingPolygons.Select(p => new Models.Client.Surface(p.Gmlid, p.Polygon, geoidHeight)));
 
         return response;
+    }
+
+    public async Task<PageData<BuildingImage>> GetBuildingsAsync(SortType sortType, int pageNumber, int pageSize)
+    {
+        var pageList = await this.repository.GetBuildingsAsync(sortType, pageNumber, pageSize);
+        return pageList.CreatePageData();
+    }
+
+    public async Task<PageData<FaceImage>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
+    {
+        var pageList = await this.repository.GetFacesAsync(buildingId, sortType, pageNumber, pageSize);
+        return pageList.CreatePageData();
     }
 
     private List<PolygonInfo> GetFacingPolygons(List<PolygonInfo> polygons, CameraInfo cameraInfo)

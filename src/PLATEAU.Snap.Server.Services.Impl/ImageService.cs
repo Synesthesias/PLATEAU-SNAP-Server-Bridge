@@ -1,5 +1,4 @@
 ﻿using PLATEAU.Snap.Models;
-using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Entities.Models;
 using PLATEAU.Snap.Server.Repositories;
@@ -43,12 +42,6 @@ internal class ImageService : IImageService
                 Exception = ex
             };
         }
-    }
-
-    public async Task<PageData<BuildingImage>> GetBuildingImagesAsync(SortType sortType, int pageNumber, int pageSize)
-    {
-        var pageList = await this.surfaceGeometryRepository.GetBuildingImagesAsync(sortType, pageNumber, pageSize);
-        return pageList.CreatePageData();
     }
 
     private static byte[] CreateThumbnailAsBytes(Stream inputStream, int width, int height)

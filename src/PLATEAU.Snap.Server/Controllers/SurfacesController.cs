@@ -1,16 +1,18 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PLATEAU.Snap.Models.Client;
-using PLATEAU.Snap.Server.Extensions.Mvc;
+using PLATEAU.Snap.Models.Common;
+using PLATEAU.Snap.Server.Filters;
 using PLATEAU.Snap.Server.Services;
 using Swashbuckle.AspNetCore.Annotations;
 using static PLATEAU.Snap.Server.Constants;
 
 namespace PLATEAU.Snap.Server.Controllers;
 
-[Route("api")]
+[Route(ApiRoute)]
 [ApiController]
 [Authorize]
+[TypeFilter(typeof(ApiExceptionFilter))]
 public class SurfacesController : ControllerBase
 {
     private readonly ILogger<SurfacesController> logger;
@@ -37,15 +39,46 @@ public class SurfacesController : ControllerBase
     public async Task<ActionResult<VisibleSurfacesResponse>> GetVisibleSurfacesAsync(
         [FromBody, SwaggerParameter("取得する面を絞り込むためのパラメータ", Required = true)] VisibleSurfacesRequest payload)
     {
-        try
-        {
-            logger.LogInformation($"{DateTime.Now}: {payload}");
-            return Ok(await service.GetVisibleSurfacesAsync(payload.ToServerParam()));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, $"{DateTime.Now}: Failed to get visible surfaces");
-            return this.HandleException(ex);
-        }
+        logger.LogInformation($"{DateTime.Now}: {payload}");
+        return Ok(await service.GetVisibleSurfacesAsync(payload.ToServerParam()));
+    }
+
+    [HttpGet]
+    [Route("buildings")]
+    [SwaggerOperation(
+        Summary = "テクスチャを更新できる建築物モデル情報を取得します。",
+        OperationId = nameof(GetBuildingsAsync)
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, SwaggerResponseDescriptions.Ok, typeof(PageData<BuildingImage>))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, SwaggerResponseDescriptions.BadRequest)]
+    [SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
+    [SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
+    public async Task<ActionResult<PageData<BuildingImage>>> GetBuildingsAsync(
+        [FromQuery, SwaggerParameter("ソート順")] SortType sortType = SortType.IdAsc,
+        [FromQuery, SwaggerParameter("ページ番号")] int pageNumber = 1,
+        [FromQuery, SwaggerParameter("ページサイズ")] int pageSize = 10)
+    {
+        logger.LogInformation($"{DateTime.Now}: {sortType}, {pageNumber}, {pageSize}");
+        return Ok(await service.GetBuildingsAsync(sortType, pageNumber, pageSize));
+    }
+
+    [HttpGet]
+    [Route("faces/{buildingId}")]
+    [SwaggerOperation(
+        Summary = "テクスチャを更新できる建築物モデルの面情報を取得します。",
+        OperationId = nameof(GetFacesAsync)
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, SwaggerResponseDescriptions.Ok, typeof(PageData<FaceImage>))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, SwaggerResponseDescriptions.BadRequest)]
+    [SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
+    [SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
+    public async Task<ActionResult<PageData<FaceImage>>> GetFacesAsync(
+        [FromRoute, SwaggerParameter("建築物モデルID")] int buildingId,
+        [FromQuery, SwaggerParameter("ソート順")] SortType sortType = SortType.IdAsc,
+        [FromQuery, SwaggerParameter("ページ番号")] int pageNumber = 1,
+        [FromQuery, SwaggerParameter("ページサイズ")] int pageSize = 10)
+    {
+        logger.LogInformation($"{DateTime.Now}: {sortType}, {pageNumber}, {pageSize}");
+        return Ok(await service.GetFacesAsync(buildingId, sortType, pageNumber, pageSize));
     }
 }

@@ -107,7 +107,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         return new CameraInfo(from.Coordinate, to.Coordinate);
     }
 
-    public async Task<PageList<BuildingImage>> GetBuildingImagesAsync(SortType sortType, int pageNumber, int pageSize)
+    public async Task<PageList<BuildingImage>> GetBuildingsAsync(SortType sortType, int pageNumber, int pageSize)
     {
         var connection = Context.Database.GetDbConnection();
         if (connection.State != ConnectionState.Open)
@@ -117,14 +117,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
         using var countCommand = connection.CreateCommand();
         countCommand.CommandText = @"
-            WITH t AS(
-              SELECT distinct b.id AS building_id, sg.gmlid FROM images AS i
-              JOIN image_surface_relations AS r ON i.id=r.image_id
-              JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
-              JOIN surface_centroid AS sc ON sg.id=sc.id
-              JOIN building AS b ON sg.root_id=b.lod2_solid_id
-            )
-            SELECT count(*) FROM t";
+            SELECT count(*) FROM(SELECT distinct building_id FROM surface_images_view)";
 
 #pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
         var count = (long)await countCommand.ExecuteScalarAsync();
@@ -137,13 +130,6 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
         using var command = connection.CreateCommand();
         command.CommandText = @$"
-            WITH t AS (
-              SELECT b.id AS building_id, sg.gmlid, i.thumbnail, sc.center FROM images AS i
-              JOIN image_surface_relations AS r ON i.id=r.image_id
-              JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
-              JOIN surface_centroid AS sc ON sg.id=sc.id
-              JOIN building AS b ON sg.root_id=b.lod2_solid_id
-            )
             SELECT
               distinct 
               building_id,
@@ -154,7 +140,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
               CASE WHEN gst_name IS NOT NULL THEN gst_name ELSE '' END ||
               CASE WHEN css_name IS NOT NULL THEN css_name ELSE '' END ||
               CASE WHEN moji IS NOT NULL THEN moji ELSE '' END AS address
-            FROM t
+            FROM surface_images_view
             LEFT OUTER JOIN town_boundary AS tb ON ST_Intersects(center, tb.geom)
             ORDER BY building_id {(sortType == SortType.IdAsc ? "ASC" : "DESC")}
             LIMIT @limit OFFSET @offset";
@@ -173,5 +159,55 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         }
 
         return new PageList<BuildingImage>(list, (int)count, pageNumber, pageSize);
+    }
+
+    public async Task<PageList<FaceImage>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
+    {
+        var connection = Context.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        using var countCommand = connection.CreateCommand();
+        countCommand.CommandText = @"
+            SELECT count(*) FROM(SELECT distinct face_id FROM surface_images_view WHERE building_id = @building_id)";
+        countCommand.Parameters.Add(countCommand.CreateParameter("@building_id", buildingId));
+
+#pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
+        var count = (long)await countCommand.ExecuteScalarAsync();
+#pragma warning restore CS8605 // null の可能性がある値をボックス化解除しています。
+
+        if (count == 0)
+        {
+            return new PageList<FaceImage>(new List<FaceImage>(), 0, pageNumber, pageSize);
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @$"
+            SELECT
+              distinct 
+              face_id,
+              gmlid,
+              thumbnail
+            FROM surface_images_view
+            WHERE building_id = @building_id
+            ORDER BY face_id {(sortType == SortType.IdAsc ? "ASC" : "DESC")}
+            LIMIT @limit OFFSET @offset";
+        command.Parameters.Add(command.CreateParameter("@building_id", buildingId));
+        command.Parameters.Add(command.CreateParameter("@limit", pageSize));
+        command.Parameters.Add(command.CreateParameter("@offset", (pageNumber - 1) * pageSize));
+
+        var list = new List<FaceImage>();
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var id = reader.GetInt32(0);
+            var gmlId = reader.GetString(1);
+            var thumbnail = await reader.IsDBNullAsync(2) ? null : await reader.GetFieldValueAsync<byte[]>(2);
+            list.Add(new FaceImage(id, gmlId, thumbnail));
+        }
+
+        return new PageList<FaceImage>(list, (int)count, pageNumber, pageSize);
     }
 }

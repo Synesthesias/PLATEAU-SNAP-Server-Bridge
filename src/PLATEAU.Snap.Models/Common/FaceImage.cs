@@ -1,6 +1,6 @@
 ﻿namespace PLATEAU.Snap.Models.Common;
 
-public class BuildingImage
+public class FaceImage
 {
     public int Id { get; set; }
 
@@ -8,13 +8,11 @@ public class BuildingImage
 
     public string? Thumbnail { get; set; } = null!;
 
-    public string Address { get; set; } = null!;
-
-    public BuildingImage()
+    public FaceImage()
     {
     }
 
-    public BuildingImage(int id, string? gmlid, byte[]? thumbnailBytes, string? address)
+    public FaceImage(int id, string? gmlid, byte[]? thumbnailBytes)
     {
         if (string.IsNullOrEmpty(gmlid))
         {
@@ -27,6 +25,5 @@ public class BuildingImage
         {
             Thumbnail = Convert.ToBase64String(thumbnailBytes);
         }
-        Address = !string.IsNullOrEmpty(address) ? address : "住所不明";
     }
 }
