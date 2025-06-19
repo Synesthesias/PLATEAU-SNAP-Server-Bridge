@@ -155,7 +155,7 @@ builder.Logging.AddSimpleConsole(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (isDevelopment)
+if (isDevelopment || builder.Configuration.GetValue<bool>("UseSwagger"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
