@@ -61,7 +61,13 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
     public async Task<PageData<FaceImage>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
     {
         var pageList = await this.repository.GetFacesAsync(buildingId, sortType, pageNumber, pageSize);
-        return pageList.CreatePageData();
+        return pageList.CreatePageDataWithSelect(x => new FaceImage(x.FaceId, x.Gmlid, x.Thumbnail));
+    }
+
+    public async Task<PageData<ImageInfo>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)
+    {
+        var pageList = await this.repository.GetFaceImagesAsync(buildingId, faceId, sortType, pageNumber, pageSize);
+        return pageList.CreatePageDataWithSelect(x => new ImageInfo(x.ImageId, x.Thumbnail, x.Timestamp));
     }
 
     private List<PolygonInfo> GetFacingPolygons(List<PolygonInfo> polygons, CameraInfo cameraInfo)

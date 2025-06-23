@@ -4,6 +4,7 @@ using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Extensions.Geometries;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Entities;
+using PLATEAU.Snap.Server.Entities.Models;
 using System.Data;
 
 namespace PLATEAU.Snap.Server.Repositories;
@@ -142,7 +143,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
               CASE WHEN moji IS NOT NULL THEN moji ELSE '' END AS address
             FROM surface_images_view
             LEFT OUTER JOIN town_boundary AS tb ON ST_Intersects(center, tb.geom)
-            ORDER BY building_id {(sortType == SortType.IdAsc ? "ASC" : "DESC")}
+            ORDER BY building_id {(sortType == SortType.id_asc ? "ASC" : "DESC")}
             LIMIT @limit OFFSET @offset";
         command.Parameters.Add(command.CreateParameter("@limit", pageSize));
         command.Parameters.Add(command.CreateParameter("@offset", (pageNumber - 1) * pageSize));
@@ -161,53 +162,36 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         return new PageList<BuildingImage>(list, (int)count, pageNumber, pageSize);
     }
 
-    public async Task<PageList<FaceImage>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
+    public async Task<PageList<SurfaceImagesView>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
     {
-        var connection = Context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
+        var query = Context.SurfaceImagesViews
+            .Where(x => x.BuildingId == buildingId)
+            .GroupBy(x => x.FaceId).Select(g => g.First());
+
+        var count = await query.CountAsync();
+        var items = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        // GroupBy を使ったあとに IQueryable のままソートすると例外がスローされるためメモリ上でソートする
+        var orderdItems = sortType switch
         {
-            await connection.OpenAsync();
-        }
+            SortType.id_asc => items.OrderBy(x => x.FaceId),
+            SortType.id_desc => items.OrderByDescending(x => x.FaceId),
+            _ => throw new ArgumentOutOfRangeException(nameof(sortType), sortType, null)
+        };
 
-        using var countCommand = connection.CreateCommand();
-        countCommand.CommandText = @"
-            SELECT count(*) FROM(SELECT distinct face_id FROM surface_images_view WHERE building_id = @building_id)";
-        countCommand.Parameters.Add(countCommand.CreateParameter("@building_id", buildingId));
+        return new PageList<SurfaceImagesView>(orderdItems.ToList(), count, pageNumber, pageSize);
+    }
 
-#pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
-        var count = (long)await countCommand.ExecuteScalarAsync();
-#pragma warning restore CS8605 // null の可能性がある値をボックス化解除しています。
-
-        if (count == 0)
+    public async Task<PageList<SurfaceImagesView>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)
+    {
+        var query = Context.SurfaceImagesViews.Where(x => x.BuildingId == buildingId && x.FaceId == faceId);
+        query = sortType switch
         {
-            return new PageList<FaceImage>(new List<FaceImage>(), 0, pageNumber, pageSize);
-        }
+            SortType.id_asc => query.OrderBy(x => x.ImageId),
+            SortType.id_desc => query.OrderByDescending(x => x.ImageId),
+            _ => throw new ArgumentOutOfRangeException(nameof(sortType), sortType, null)
+        };
 
-        using var command = connection.CreateCommand();
-        command.CommandText = @$"
-            SELECT
-              distinct 
-              face_id,
-              gmlid,
-              thumbnail
-            FROM surface_images_view
-            WHERE building_id = @building_id
-            ORDER BY face_id {(sortType == SortType.IdAsc ? "ASC" : "DESC")}
-            LIMIT @limit OFFSET @offset";
-        command.Parameters.Add(command.CreateParameter("@building_id", buildingId));
-        command.Parameters.Add(command.CreateParameter("@limit", pageSize));
-        command.Parameters.Add(command.CreateParameter("@offset", (pageNumber - 1) * pageSize));
-
-        var list = new List<FaceImage>();
-        using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            var id = reader.GetInt32(0);
-            var gmlId = reader.GetString(1);
-            var thumbnail = await reader.IsDBNullAsync(2) ? null : await reader.GetFieldValueAsync<byte[]>(2);
-            list.Add(new FaceImage(id, gmlId, thumbnail));
-        }
-
-        return new PageList<FaceImage>(list, (int)count, pageNumber, pageSize);
+        return await PageList<SurfaceImagesView>.ToPageListAsync(query, pageNumber, pageSize);
     }
 }

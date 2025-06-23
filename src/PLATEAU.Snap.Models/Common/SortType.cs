@@ -2,6 +2,6 @@
 
 public enum SortType
 {
-    IdAsc,
-    IdDesc,
+    id_asc,
+    id_desc,
 }

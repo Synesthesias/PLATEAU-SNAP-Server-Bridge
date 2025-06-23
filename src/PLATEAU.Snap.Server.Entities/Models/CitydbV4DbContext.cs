@@ -28,6 +28,8 @@ public partial class CitydbV4DbContext : DbContext
 
     public virtual DbSet<SurfaceGeometry> SurfaceGeometries { get; set; }
 
+    public virtual DbSet<SurfaceImagesView> SurfaceImagesViews { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -422,6 +424,25 @@ public partial class CitydbV4DbContext : DbContext
             entity.HasOne(d => d.Root).WithMany(p => p.InverseRoot)
                 .HasForeignKey(d => d.RootId)
                 .HasConstraintName("surface_geom_root_fk");
+        });
+
+        modelBuilder.Entity<SurfaceImagesView>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("surface_images_view", "citydb");
+
+            entity.Property(e => e.BuildingId).HasColumnName("building_id");
+            entity.Property(e => e.Center)
+                .HasColumnType("geometry(Geometry,4326)")
+                .HasColumnName("center");
+            entity.Property(e => e.FaceId).HasColumnName("face_id");
+            entity.Property(e => e.Gmlid)
+                .HasMaxLength(256)
+                .HasColumnName("gmlid");
+            entity.Property(e => e.ImageId).HasColumnName("image_id");
+            entity.Property(e => e.Thumbnail).HasColumnName("thumbnail");
+            entity.Property(e => e.Timestamp).HasColumnName("timestamp");
         });
         modelBuilder.HasSequence("address_seq", "citydb")
             .HasMin(0L)

@@ -100,9 +100,10 @@ SELECT id, gmlid, ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometr
 
 CREATE INDEX IF NOT EXISTS surface_centroid_center_geom_idx ON citydb.surface_centroid USING gist (center);
 
+DROP view IF EXISTS surface_images_view;
 CREATE OR REPLACE VIEW surface_images_view AS
-  SELECT b.id AS building_id, sg.id AS face_id, i.id AS image_id, sg.gmlid, i.thumbnail, sc.center FROM images AS i
+  SELECT b.id AS building_id, sg.id AS face_id, i.id AS image_id, sg.gmlid, i.thumbnail, i.timestamp, sc.center FROM images AS i
   JOIN image_surface_relations AS r ON i.id=r.image_id
   JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
   JOIN surface_centroid AS sc ON sg.id=sc.id
-  JOIN building AS b ON sg.root_id=b.lod2_solid_id;
+  JOIN building AS b ON sg.cityobject_id=b.id;

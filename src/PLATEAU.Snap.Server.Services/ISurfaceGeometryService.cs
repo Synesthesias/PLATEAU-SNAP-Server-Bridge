@@ -10,4 +10,6 @@ public interface ISurfaceGeometryService
     Task<PageData<BuildingImage>> GetBuildingsAsync(SortType sortType, int pageNumber, int pageSize);
 
     Task<PageData<FaceImage>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize);
+
+    Task<PageData<ImageInfo>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize);
 }

@@ -54,16 +54,16 @@ public class SurfacesController : ControllerBase
     [SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
     [SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
     public async Task<ActionResult<PageData<BuildingImage>>> GetBuildingsAsync(
-        [FromQuery, SwaggerParameter("ソート順")] SortType sortType = SortType.IdAsc,
-        [FromQuery, SwaggerParameter("ページ番号")] int pageNumber = 1,
-        [FromQuery, SwaggerParameter("ページサイズ")] int pageSize = 10)
+        [FromQuery, SwaggerParameter("ソート順")] SortType sort_type = SortType.id_asc,
+        [FromQuery, SwaggerParameter("ページ番号")] int page_number = 1,
+        [FromQuery, SwaggerParameter("ページサイズ")] int page_size = 10)
     {
-        logger.LogInformation($"{DateTime.Now}: {sortType}, {pageNumber}, {pageSize}");
-        return Ok(await service.GetBuildingsAsync(sortType, pageNumber, pageSize));
+        logger.LogInformation($"{DateTime.Now}: {sort_type}, {page_number}, {page_size}");
+        return Ok(await service.GetBuildingsAsync(sort_type, page_number, page_size));
     }
 
     [HttpGet]
-    [Route("faces/{buildingId}")]
+    [Route("faces/{building_id}")]
     [SwaggerOperation(
         Summary = "テクスチャを更新できる建築物モデルの面情報を取得します。",
         OperationId = nameof(GetFacesAsync)
@@ -73,12 +73,33 @@ public class SurfacesController : ControllerBase
     [SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
     [SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
     public async Task<ActionResult<PageData<FaceImage>>> GetFacesAsync(
-        [FromRoute, SwaggerParameter("建築物モデルID")] int buildingId,
-        [FromQuery, SwaggerParameter("ソート順")] SortType sortType = SortType.IdAsc,
-        [FromQuery, SwaggerParameter("ページ番号")] int pageNumber = 1,
-        [FromQuery, SwaggerParameter("ページサイズ")] int pageSize = 10)
+        [FromRoute, SwaggerParameter("建築物モデルID")] int building_id,
+        [FromQuery, SwaggerParameter("ソート順")] SortType sort_type = SortType.id_asc,
+        [FromQuery, SwaggerParameter("ページ番号")] int page_number = 1,
+        [FromQuery, SwaggerParameter("ページサイズ")] int page_size = 10)
     {
-        logger.LogInformation($"{DateTime.Now}: {sortType}, {pageNumber}, {pageSize}");
-        return Ok(await service.GetFacesAsync(buildingId, sortType, pageNumber, pageSize));
+        logger.LogInformation($"{DateTime.Now}: {sort_type}, {page_number}, {page_size}");
+        return Ok(await service.GetFacesAsync(building_id, sort_type, page_number, page_size));
+    }
+
+    [HttpGet]
+    [Route("images/{building_id}/{face_id}")]
+    [SwaggerOperation(
+        Summary = "面に紐づけられた画像一覧を取得します。",
+        OperationId = nameof(GetFaceImagesAsync)
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, SwaggerResponseDescriptions.Ok, typeof(PageData<ImageInfo>))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, SwaggerResponseDescriptions.BadRequest)]
+    [SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
+    [SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
+    public async Task<ActionResult<PageData<ImageInfo>>> GetFaceImagesAsync(
+        [FromRoute, SwaggerParameter("建築物モデルID")] int building_id,
+        [FromRoute, SwaggerParameter("面ID")] int face_id,
+        [FromQuery, SwaggerParameter("ソート順")] SortType sort_type = SortType.id_asc,
+        [FromQuery, SwaggerParameter("ページ番号")] int page_number = 1,
+        [FromQuery, SwaggerParameter("ページサイズ")] int page_size = 10)
+    {
+        logger.LogInformation($"{DateTime.Now}: {sort_type}, {page_number}, {page_size}");
+        return Ok(await service.GetFaceImagesAsync(building_id, face_id, sort_type, page_number, page_size));
     }
 }

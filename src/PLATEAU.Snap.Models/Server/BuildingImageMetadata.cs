@@ -37,7 +37,7 @@ public class BuildingImageMetadata
         // 最低3つの頂点分の座標が必要
         if (Exterior.Count < 6)
         {
-            throw new ArgumentException($"{nameof(Exterior)} must contain at least 3 elements.");
+            throw new ArgumentException($"{nameof(Exterior)} must contain at least 6 elements.");
         }
         // 外壁の頂点は偶数個でなければならない（2つの座標で1つの頂点を表すため）
         if (Exterior.Count % 2 != 0)
