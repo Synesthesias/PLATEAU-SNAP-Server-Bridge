@@ -1,3 +1,4 @@
+using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SecretsManager;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Npgsql;
+using PLATEAU.Snap.Models.Settings;
 using PLATEAU.Snap.Server;
 using PLATEAU.Snap.Server.Entities;
 using PLATEAU.Snap.Server.Extensions.DependencyInjection;
@@ -26,10 +28,8 @@ if (!isDevelopment)
 {
     var secretName = Environment.GetEnvironmentVariable("SECRET_NAME");
     ArgumentNullException.ThrowIfNull(secretName);
-    Console.WriteLine($"Secret Name: {secretName}");
 
     var response = await new AmazonSecretsManagerClient().GetSecretValueAsync(new GetSecretValueRequest() { SecretId = secretName });
-    Console.WriteLine($"GetSecretValueResponse: {response.HttpStatusCode}");
     var dic = JsonSerializer.Deserialize<Dictionary<string, string?>>(response.SecretString);
     configuration.AddInMemoryCollection(dic);
 }
@@ -51,7 +51,6 @@ ArgumentNullException.ThrowIfNull(appSettings);
 Grid grid;
 if (!isDevelopment)
 {
-    configuration.GetValue<string>("Geoid:Path");
     using var response = await new AmazonS3Client().GetObjectAsync(new GetObjectRequest { BucketName = s3Settings.Bucket, Key = "gsigeo2011_ver2_2.asc" });
     using var geoidoReader = new GeoidReader(response.ResponseStream);
     grid = geoidoReader.Read();
@@ -65,12 +64,12 @@ else
     using var geoidoReader = new GeoidReader(path);
     grid = geoidoReader.Read();
 }
-Console.WriteLine($"GridInfo: {grid.GridInfo}");
 
 // Add services to the container.
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton(grid);
 builder.Services.AddSingleton(appSettings);
+builder.Services.AddSingleton(databaseSettings);
 builder.Services.UseDefaultServices();
 builder.Services.UsePostgreSQLRepositories();
 builder.Services.UseS3Repositories();

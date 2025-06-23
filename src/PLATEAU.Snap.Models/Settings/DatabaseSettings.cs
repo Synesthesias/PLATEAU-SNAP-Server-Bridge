@@ -1,4 +1,4 @@
-﻿namespace PLATEAU.Snap.Server;
+﻿namespace PLATEAU.Snap.Models.Settings;
 
 public class DatabaseSettings
 {
