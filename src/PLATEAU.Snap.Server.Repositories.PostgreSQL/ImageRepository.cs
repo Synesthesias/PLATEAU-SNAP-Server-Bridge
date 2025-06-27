@@ -51,4 +51,9 @@ internal class ImageRepository : BaseRepository, IImageRepository
             throw new SnapServerException($"Failed to upload image. [Insert] ErrorCode: {ex.ErrorCode}, Message: {ex.Message}");
         }
     }
+
+    public Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes)
+    {
+        return this.storage.GeneratePreSignedURLAsync(objectKey, expiryInMinutes);
+    }
 }

@@ -5,4 +5,6 @@ namespace PLATEAU.Snap.Server.Repositories;
 public interface IImageRepository
 {
     Task<Image> CreateAsync(Image image, Stream stream);
+
+    Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes);
 }

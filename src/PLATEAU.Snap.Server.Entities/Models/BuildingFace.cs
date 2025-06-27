@@ -4,7 +4,7 @@ using NetTopologySuite.Geometries;
 
 namespace PLATEAU.Snap.Server.Entities.Models;
 
-public partial class SurfaceImagesView
+public partial class BuildingFace
 {
     public int? BuildingId { get; set; }
 
@@ -14,9 +14,11 @@ public partial class SurfaceImagesView
 
     public string? Gmlid { get; set; }
 
+    public bool? IsOrtho { get; set; }
+
     public byte[]? Thumbnail { get; set; }
 
-    public DateTime? Timestamp { get; set; }
+    public Geometry? Coordinates { get; set; }
 
-    public Geometry? Center { get; set; }
+    public DateTime? Timestamp { get; set; }
 }

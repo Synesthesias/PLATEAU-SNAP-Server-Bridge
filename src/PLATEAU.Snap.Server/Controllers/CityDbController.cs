@@ -43,4 +43,42 @@ public class CityDbController : ControllerBase
         var stream = await service.ExportAsync(payload.Id);
         return File(stream, "application/zip", payload.FileName ?? $"{payload.Id}.zip");
     }
+
+    // スコープから外れていたためコメントアウト
+    //[HttpPost]
+    //[Route("textures/preview")]
+    //[SwaggerOperation(
+    //    Summary = "テクスチャを適用した gltf を取得します。",
+    //    OperationId = nameof(PreviewTextureAsync)
+    //)]
+    //[SwaggerResponse(StatusCodes.Status200OK, SwaggerResponseDescriptions.Ok, typeof(PreviewTextureResponse))]
+    //[SwaggerResponse(StatusCodes.Status400BadRequest, SwaggerResponseDescriptions.BadRequest)]
+    //[SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
+    //[SwaggerResponse(StatusCodes.Status404NotFound, SwaggerResponseDescriptions.NotFound)]
+    //[SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
+    //public async Task<ActionResult<PreviewTextureResponse>> PreviewTextureAsync(
+    //    [FromBody, SwaggerParameter("正射変換するためのパラメータ", Required = true)] PreviewTextureRequest payload)
+    //{
+    //    logger.LogInformation($"{DateTime.Now}: {payload}");
+    //    return Ok(await service.PreviewTextureRequest(payload));
+    //}
+
+    [HttpPut]
+    [Route("textures")]
+    [SwaggerOperation(
+        Summary = "テクスチャを更新します。",
+        OperationId = nameof(ApplyTextureAsync)
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, SwaggerResponseDescriptions.Ok)]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, SwaggerResponseDescriptions.BadRequest)]
+    [SwaggerResponse(StatusCodes.Status401Unauthorized, SwaggerResponseDescriptions.Unauthorized)]
+    [SwaggerResponse(StatusCodes.Status404NotFound, SwaggerResponseDescriptions.NotFound)]
+    [SwaggerResponse(StatusCodes.Status500InternalServerError, SwaggerResponseDescriptions.InternalServerError)]
+    public async Task<ActionResult> ApplyTextureAsync(
+        [FromBody, SwaggerParameter("正射変換するためのパラメータ", Required = true)] ApplyTextureRequest payload)
+    {
+        logger.LogInformation($"{DateTime.Now}: {payload}");
+        await service.ApplyTextureAsync(payload);
+        return Ok();
+    }
 }

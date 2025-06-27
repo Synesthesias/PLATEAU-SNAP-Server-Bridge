@@ -18,6 +18,8 @@ public partial class CitydbV4DbContext : DbContext
 
     public virtual DbSet<Building> Buildings { get; set; }
 
+    public virtual DbSet<BuildingFace> BuildingFaces { get; set; }
+
     public virtual DbSet<CityBoundary> CityBoundaries { get; set; }
 
     public virtual DbSet<Cityobject> Cityobjects { get; set; }
@@ -26,9 +28,11 @@ public partial class CitydbV4DbContext : DbContext
 
     public virtual DbSet<ImageSurfaceRelation> ImageSurfaceRelations { get; set; }
 
+    public virtual DbSet<RoofSurface> RoofSurfaces { get; set; }
+
     public virtual DbSet<SurfaceGeometry> SurfaceGeometries { get; set; }
 
-    public virtual DbSet<SurfaceImagesView> SurfaceImagesViews { get; set; }
+    public virtual DbSet<SurfaceImage> SurfaceImages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -222,6 +226,24 @@ public partial class CitydbV4DbContext : DbContext
                 .HasConstraintName("building_lod4solid_fk");
         });
 
+        modelBuilder.Entity<BuildingFace>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("building_faces", "citydb");
+
+            entity.Property(e => e.BuildingId).HasColumnName("building_id");
+            entity.Property(e => e.Coordinates).HasColumnName("coordinates");
+            entity.Property(e => e.FaceId).HasColumnName("face_id");
+            entity.Property(e => e.Gmlid)
+                .HasMaxLength(256)
+                .HasColumnName("gmlid");
+            entity.Property(e => e.ImageId).HasColumnName("image_id");
+            entity.Property(e => e.IsOrtho).HasColumnName("is_ortho");
+            entity.Property(e => e.Thumbnail).HasColumnName("thumbnail");
+            entity.Property(e => e.Timestamp).HasColumnName("timestamp");
+        });
+
         modelBuilder.Entity<CityBoundary>(entity =>
         {
             entity.HasKey(e => e.Fid).HasName("city_boundary_pkey");
@@ -334,7 +356,9 @@ public partial class CitydbV4DbContext : DbContext
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("nextval('images_id_seq'::regclass)")
                 .HasColumnName("id");
-            entity.Property(e => e.Exterior).HasColumnName("exterior");
+            entity.Property(e => e.Coordinates)
+                .HasColumnType("geometry(Polygon)")
+                .HasColumnName("coordinates");
             entity.Property(e => e.FromAltitude).HasColumnName("from_altitude");
             entity.Property(e => e.FromLatitude).HasColumnName("from_latitude");
             entity.Property(e => e.FromLongitude).HasColumnName("from_longitude");
@@ -371,6 +395,19 @@ public partial class CitydbV4DbContext : DbContext
                 .HasForeignKey(d => d.ImageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("image_surface_relations_image_id_fkey");
+        });
+
+        modelBuilder.Entity<RoofSurface>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("roof_surfaces", "citydb");
+
+            entity.Property(e => e.BuildingId).HasColumnName("building_id");
+            entity.Property(e => e.FaceId).HasColumnName("face_id");
+            entity.Property(e => e.Gmlid)
+                .HasMaxLength(256)
+                .HasColumnName("gmlid");
         });
 
         modelBuilder.Entity<SurfaceGeometry>(entity =>
@@ -426,16 +463,17 @@ public partial class CitydbV4DbContext : DbContext
                 .HasConstraintName("surface_geom_root_fk");
         });
 
-        modelBuilder.Entity<SurfaceImagesView>(entity =>
+        modelBuilder.Entity<SurfaceImage>(entity =>
         {
             entity
                 .HasNoKey()
-                .ToView("surface_images_view", "citydb");
+                .ToView("surface_images", "citydb");
 
             entity.Property(e => e.BuildingId).HasColumnName("building_id");
-            entity.Property(e => e.Center)
-                .HasColumnType("geometry(Geometry,4326)")
-                .HasColumnName("center");
+            entity.Property(e => e.Center).HasColumnName("center");
+            entity.Property(e => e.Coordinates)
+                .HasColumnType("geometry(Polygon)")
+                .HasColumnName("coordinates");
             entity.Property(e => e.FaceId).HasColumnName("face_id");
             entity.Property(e => e.Gmlid)
                 .HasMaxLength(256)

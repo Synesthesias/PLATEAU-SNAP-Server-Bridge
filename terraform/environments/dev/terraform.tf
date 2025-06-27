@@ -1,9 +1,6 @@
 locals {
   aws = {
     region                = "<AWS Region>"
-    aws_access_key_id     = "<AWS Access Key>"
-    aws_secret_access_key = "<AWS Secret Access Key>"
-    aws_session_token     = "<AWS Session Token>"
   }
 
   app_name_prefix = "plateausnap"
@@ -23,7 +20,7 @@ locals {
   }
 
   rds = {
-    engine_version    = "16.6"
+    engine_version    = "16.8"
     instance_class    = "db.t3.large"
     storage_type      = "gp2"
     allocated_storage = 20

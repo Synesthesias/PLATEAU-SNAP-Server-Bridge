@@ -1,4 +1,3 @@
-using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SecretsManager;
@@ -7,6 +6,7 @@ using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using NetTopologySuite.Geometries;
 using Npgsql;
 using PLATEAU.Snap.Models.Settings;
 using PLATEAU.Snap.Server;
@@ -101,6 +101,7 @@ builder.Services.AddDbContext<CitydbV4DbContext>(options =>
     }
 });
 builder.Services.AddSingleton(s3Settings);
+builder.Services.AddSingleton(new GeometryFactory());
 
 // Exception Handler
 builder.Services.AddProblemDetails();

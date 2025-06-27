@@ -118,7 +118,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
         using var countCommand = connection.CreateCommand();
         countCommand.CommandText = @"
-            SELECT count(*) FROM(SELECT distinct building_id FROM surface_images_view)";
+            SELECT count(*) FROM(SELECT distinct building_id FROM surface_images)";
 
 #pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
         var count = (long)await countCommand.ExecuteScalarAsync();
@@ -141,7 +141,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
               CASE WHEN gst_name IS NOT NULL THEN gst_name ELSE '' END ||
               CASE WHEN css_name IS NOT NULL THEN css_name ELSE '' END ||
               CASE WHEN moji IS NOT NULL THEN moji ELSE '' END AS address
-            FROM surface_images_view
+            FROM surface_images
             LEFT OUTER JOIN town_boundary AS tb ON ST_Intersects(center, tb.geom)
             ORDER BY building_id {(sortType == SortType.id_asc ? "ASC" : "DESC")}
             LIMIT @limit OFFSET @offset";
@@ -154,17 +154,17 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         {
             var id = reader.GetInt32(0);
             var gmlId = reader.GetString(1);
-            var thumbnail = await reader.IsDBNullAsync(2) ? null : await reader.GetFieldValueAsync<byte[]>(2);
-            var address = await reader.IsDBNullAsync(3) ? null : reader.GetString(3);
+            var thumbnail = !(await reader.IsDBNullAsync(2)) ? await reader.GetFieldValueAsync<byte[]>(2) : throw new InvalidOperationException();
+            var address = !(await reader.IsDBNullAsync(3)) ? reader.GetString(3) : "住所不明";
             list.Add(new BuildingImage(id, gmlId, thumbnail, address));
         }
 
         return new PageList<BuildingImage>(list, (int)count, pageNumber, pageSize);
     }
 
-    public async Task<PageList<SurfaceImagesView>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
+    public async Task<PageList<BuildingFace>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
     {
-        var query = Context.SurfaceImagesViews
+        var query = Context.BuildingFaces
             .Where(x => x.BuildingId == buildingId)
             .GroupBy(x => x.FaceId).Select(g => g.First());
 
@@ -174,17 +174,17 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         // GroupBy を使ったあとに IQueryable のままソートすると例外がスローされるためメモリ上でソートする
         var orderdItems = sortType switch
         {
-            SortType.id_asc => items.OrderBy(x => x.FaceId),
-            SortType.id_desc => items.OrderByDescending(x => x.FaceId),
+            SortType.id_asc => items.OrderBy(x => x.IsOrtho).ThenBy(x => x.FaceId),
+            SortType.id_desc => items.OrderBy(x => x.IsOrtho).ThenByDescending(x => x.FaceId),
             _ => throw new ArgumentOutOfRangeException(nameof(sortType), sortType, null)
         };
 
-        return new PageList<SurfaceImagesView>(orderdItems.ToList(), count, pageNumber, pageSize);
+        return new PageList<BuildingFace>(orderdItems.ToList(), count, pageNumber, pageSize);
     }
 
-    public async Task<PageList<SurfaceImagesView>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)
+    public async Task<PageList<BuildingFace>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)
     {
-        var query = Context.SurfaceImagesViews.Where(x => x.BuildingId == buildingId && x.FaceId == faceId);
+        var query = Context.BuildingFaces.Where(x => x.BuildingId == buildingId && x.FaceId == faceId);
         query = sortType switch
         {
             SortType.id_asc => query.OrderBy(x => x.ImageId),
@@ -192,6 +192,6 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
             _ => throw new ArgumentOutOfRangeException(nameof(sortType), sortType, null)
         };
 
-        return await PageList<SurfaceImagesView>.ToPageListAsync(query, pageNumber, pageSize);
+        return await PageList<BuildingFace>.ToPageListAsync(query, pageNumber, pageSize);
     }
 }

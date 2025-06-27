@@ -1,4 +1,6 @@
-﻿using PLATEAU.Snap.Models.Client;
+﻿using NetTopologySuite.IO;
+using PLATEAU.Snap.Models.Client;
+using System.Text.Json.Serialization;
 
 namespace PLATEAU.Snap.Models.Server;
 
@@ -12,9 +14,12 @@ public class BuildingImageMetadata
 
     public double Roll { get; set; }
 
-    public List<float> Exterior { get; set; } = null!;
+    public string Coordinates { get; set; } = null!;
 
     public DateTime Timestamp { get; set; }
+
+    [JsonIgnore]
+    public NetTopologySuite.Geometries.Polygon Polygon { get; set; } = null!;
 
     public void Validate()
     {
@@ -30,20 +35,18 @@ public class BuildingImageMetadata
         {
             throw new ArgumentException($"{nameof(To)} is required.");
         }
-        if (Exterior == null)
+        if (string.IsNullOrEmpty(Coordinates))
         {
-            throw new ArgumentException($"{nameof(Exterior)} is required.");
+            throw new ArgumentException($"{nameof(Coordinates)} is required.");
         }
-        // 最低3つの頂点分の座標が必要
-        if (Exterior.Count < 6)
+        var reader = new WKTReader();
+        var polygon = reader.Read(Coordinates) as NetTopologySuite.Geometries.Polygon;
+        if (polygon is null || !polygon.IsValid)
         {
-            throw new ArgumentException($"{nameof(Exterior)} must contain at least 6 elements.");
+            throw new ArgumentException($"{nameof(Coordinates)} is not a valid polygon.");
         }
-        // 外壁の頂点は偶数個でなければならない（2つの座標で1つの頂点を表すため）
-        if (Exterior.Count % 2 != 0)
-        {
-            throw new ArgumentException($"{nameof(Exterior)} must contain an even number of elements.");
-        }
+        Polygon = polygon;
+
         if (Timestamp == default)
         {
             throw new ArgumentException($"{nameof(Timestamp)} is required.");

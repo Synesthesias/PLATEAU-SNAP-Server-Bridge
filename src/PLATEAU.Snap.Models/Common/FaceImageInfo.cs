@@ -3,11 +3,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace PLATEAU.Snap.Models.Common;
 
-public class ImageInfo
+public class FaceImageInfo
 {
     [Required]
-    [SwaggerSchema("画像のID(オルソ画像のときはnull)", ReadOnly = true, Nullable = true)]
-    public long? Id { get; set; }
+    [SwaggerSchema("面のID", ReadOnly = true, Nullable = true)]
+    public int Id { get; set; }
 
     [Required]
     [SwaggerSchema("建物面のGML ID", ReadOnly = true, Nullable = false)]
@@ -25,11 +25,11 @@ public class ImageInfo
     [SwaggerSchema("オルソ画像かどうか", ReadOnly = true, Nullable = false)]
     public bool IsOrtho { get; set; }
 
-    public ImageInfo()
+    public FaceImageInfo()
     {
     }
 
-    public ImageInfo(long? id, string? gmlid, byte[]? thumbnailBytes, DateTime? timestamp, bool isOrtho)
+    public FaceImageInfo(int id, string? gmlid, byte[]? thumbnailBytes, DateTime? timestamp, bool isOrtho)
     {
         if (string.IsNullOrEmpty(gmlid))
         {

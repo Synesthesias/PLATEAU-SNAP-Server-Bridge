@@ -8,7 +8,6 @@ public static class ServiceCollectionExtensions
     {
         return services
             .AddScoped<ISurfaceGeometryService, SurfaceGeometryService>()
-            .AddScoped<IImageService, ImageService>()
             .AddScoped<ICityDbService, CityDbService>();
     }
 }

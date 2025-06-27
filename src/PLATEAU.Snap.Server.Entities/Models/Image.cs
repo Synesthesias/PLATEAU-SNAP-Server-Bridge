@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using NetTopologySuite.Geometries;
 
 namespace PLATEAU.Snap.Server.Entities.Models;
 
@@ -23,7 +24,7 @@ public partial class Image
 
     public double Roll { get; set; }
 
-    public List<float> Exterior { get; set; } = null!;
+    public Polygon Coordinates { get; set; } = null!;
 
     public byte[] Thumbnail { get; set; } = null!;
 

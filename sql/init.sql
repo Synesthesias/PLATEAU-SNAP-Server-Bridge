@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS citydb.images (
   to_longitude double precision NOT NULL,
   to_altitude double precision NOT NULL,
   roll double precision NOT NULL,
-  exterior real[] NOT NULL,
+  coordinates geometry(Polygon) NOT NULL,
   thumbnail bytea NOT NULL,
   timestamp timestamp with time zone NOT NULL DEFAULT current_timestamp
 );
@@ -87,23 +87,53 @@ CREATE TABLE IF NOT EXISTS citydb.surface_centroid
 (
     id integer primary key,
     gmlid varchar(256) NOT NULL,
-    center geometry(Geometry,4326)
+    center geometry(Geometry,4326) NOT NULL,
+    building_id integer NOT NULL
 );
 
 WITH t AS (
-    SELECT sg.* FROM citydb.building AS b
+    SELECT sg.*,b.id AS building_id FROM citydb.building AS b
     JOIN surface_geometry AS sg ON b.lod2_solid_id=sg.root_id
     WHERE parent_id IS NOT NULL AND is_composite = 0
 )
 INSERT INTO surface_centroid
-SELECT id, gmlid, ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326)) as center FROM t;
+SELECT id, gmlid, ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326)) as center, building_id FROM t;
 
 CREATE INDEX IF NOT EXISTS surface_centroid_center_geom_idx ON citydb.surface_centroid USING gist (center);
+CREATE INDEX IF NOT EXISTS surface_centroid_building_id_idx ON citydb.surface_centroid (building_id);
 
-DROP view IF EXISTS surface_images_view;
-CREATE OR REPLACE VIEW surface_images_view AS
-  SELECT b.id AS building_id, sg.id AS face_id, i.id AS image_id, sg.gmlid, i.thumbnail, i.timestamp, sc.center FROM images AS i
-  JOIN image_surface_relations AS r ON i.id=r.image_id
-  JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
-  JOIN surface_centroid AS sc ON sg.id=sc.id
-  JOIN building AS b ON sg.cityobject_id=b.id;
+DROP view IF EXISTS surface_images;
+CREATE OR REPLACE VIEW surface_images AS
+SELECT
+  b.id AS building_id,
+  sg.id AS face_id,
+  i.id AS image_id,
+  sg.gmlid,
+  i.thumbnail,
+  i.coordinates,
+  i.timestamp,
+  ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326)) as center
+FROM images AS i
+JOIN image_surface_relations AS r ON i.id=r.image_id
+JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
+JOIN thematic_surface ts ON sg.root_id = ts.lod2_multi_surface_id
+JOIN building b ON ts.building_id = b.id;
+
+DROP view IF EXISTS roof_surfaces;
+CREATE OR REPLACE VIEW roof_surfaces AS
+SELECT
+  b.id AS building_id,
+  sg.id AS face_id,
+  sg.gmlid
+FROM surface_geometry sg
+JOIN thematic_surface ts ON sg.root_id = ts.lod2_multi_surface_id
+JOIN building b ON ts.building_id = b.id
+WHERE ts.objectclass_id = (
+  SELECT id FROM objectclass WHERE classname = 'BuildingRoofSurface'
+) AND sg.parent_id IS NOT NULL;
+
+DROP view IF EXISTS building_faces;
+CREATE OR REPLACE VIEW building_faces AS
+SELECT building_id, face_id, image_id, gmlid, false AS is_ortho, thumbnail, coordinates, timestamp FROM surface_images
+UNION ALL
+SELECT building_id, face_id, NULL, gmlid, true AS is_ortho, NULL, NULL, NULL FROM roof_surfaces;

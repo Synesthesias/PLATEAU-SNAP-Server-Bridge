@@ -1,4 +1,5 @@
-﻿using PLATEAU.Snap.Models.Settings;
+﻿using PLATEAU.Snap.Models.Client;
+using PLATEAU.Snap.Models.Settings;
 using System.Diagnostics;
 
 namespace PLATEAU.Snap.Server.Services;
@@ -63,5 +64,19 @@ internal class CityDbService : ICityDbService
                 Directory.Delete(tempDirectory, true);
             }
         }
+    }
+
+    public async Task<PreviewTextureResponse> PreviewTextureRequest(PreviewTextureRequest payload)
+    {
+        // Mock実装
+        return await Task.FromResult(new PreviewTextureResponse
+        {
+        });
+    }
+
+    public async Task ApplyTextureAsync(ApplyTextureRequest payload)
+    {
+        // Mock実装
+        await Task.CompletedTask;
     }
 }
