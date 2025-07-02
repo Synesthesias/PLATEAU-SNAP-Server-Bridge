@@ -13,6 +13,10 @@ public class RoofExtractionResponse
     public StatusType Status { get; set; }
 
     [Required]
+    [SwaggerSchema("画像のパス", ReadOnly = true, Nullable = true)]
+    public string? Path { get; set; }
+
+    [Required]
     [SwaggerSchema("画像をダウンロードするための Presigned URL", ReadOnly = true, Nullable = true)]
     public string? Uri { get; set; }
 
@@ -27,9 +31,10 @@ public class RoofExtractionResponse
     {
     }
 
-    public RoofExtractionResponse(StatusType status, string? uri, Polygon? polygon)
+    public RoofExtractionResponse(StatusType status, string? path, string? uri, Polygon? polygon)
     {
         Status = status;
+        Path = path;
         Uri = uri;
         Polygon = polygon;
         

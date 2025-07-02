@@ -17,8 +17,8 @@ public class ApplyTextureRequest
     public int FaceId { get; set; }
 
     [Required]
-    [SwaggerSchema("transform または roof-extraction で取得した Presigned URL", Nullable = false)]
-    public int Uri { get; set; }
+    [SwaggerSchema("transform または roof-extraction で取得した画像のパス", Nullable = false)]
+    public string Path { get; set; } = null!;
 
     [Required]
     [SwaggerSchema("座標情報 (WKT形式)", Nullable = false)]

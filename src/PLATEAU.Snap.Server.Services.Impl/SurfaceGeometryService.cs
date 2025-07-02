@@ -117,7 +117,7 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
             new Coordinate(1100, 725),
             new Coordinate(77, 725)
         ]);
-        return new Models.Client.TransformResponse(Models.Client.StatusType.Success, preSignedURL, polygon);
+        return new Models.Client.TransformResponse(Models.Client.StatusType.Success, "S3://temp/42.png", preSignedURL, polygon);
     }
 
     public async Task<Models.Client.RoofExtractionResponse> RoofExtractionAsync(Models.Client.RoofExtractionRequest payload)
@@ -136,7 +136,7 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
             new Coordinate(152,50),
             new Coordinate(105,40)
         ]);
-        return new Models.Client.RoofExtractionResponse(Models.Client.StatusType.Success, preSignedURL, polygon);
+        return new Models.Client.RoofExtractionResponse(Models.Client.StatusType.Success, "S3://temp/103251.png", preSignedURL, polygon);
     }
 
     private static byte[] CreateThumbnailAsBytes(Stream inputStream, int width, int height)
