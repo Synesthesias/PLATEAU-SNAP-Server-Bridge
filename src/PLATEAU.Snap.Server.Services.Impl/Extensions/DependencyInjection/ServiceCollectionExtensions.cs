@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Amazon.Lambda;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace PLATEAU.Snap.Server.Services;
 
@@ -8,6 +9,8 @@ public static class ServiceCollectionExtensions
     {
         return services
             .AddScoped<ISurfaceGeometryService, SurfaceGeometryService>()
-            .AddScoped<ICityDbService, CityDbService>();
+            .AddScoped<ICityDbService, CityDbService>()
+            .AddScoped<IImageProcessingService, ImageProcessingService>()
+            .AddAWSService<IAmazonLambda>();
     }
 }

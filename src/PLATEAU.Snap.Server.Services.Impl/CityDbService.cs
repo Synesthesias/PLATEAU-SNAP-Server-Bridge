@@ -6,12 +6,15 @@ namespace PLATEAU.Snap.Server.Services;
 
 internal class CityDbService : ICityDbService
 {
+    private readonly IImageProcessingService imageProcessingService;
+
     private readonly AppSettings appSettings;
 
     private readonly DatabaseSettings databaseSettings;
 
-    public CityDbService(AppSettings appSettings, DatabaseSettings databaseSettings)
+    public CityDbService(IImageProcessingService imageProcessingService, AppSettings appSettings, DatabaseSettings databaseSettings)
     {
+        this.imageProcessingService = imageProcessingService;
         this.appSettings = appSettings;
         this.databaseSettings = databaseSettings;
     }
@@ -68,15 +71,17 @@ internal class CityDbService : ICityDbService
 
     public async Task<PreviewTextureResponse> PreviewTextureRequest(PreviewTextureRequest payload)
     {
-        // Mock実装
-        return await Task.FromResult(new PreviewTextureResponse
-        {
-        });
+        await Task.CompletedTask;
+        throw new NotImplementedException("PreviewTextureRequest is not implemented yet.");
     }
 
     public async Task ApplyTextureAsync(ApplyTextureRequest payload)
     {
-        // Mock実装
-        await Task.CompletedTask;
+        // TODO: パラメータ構築
+        var response = await imageProcessingService.ApplyTextureAsync(new Models.Lambda.LambdaApplyTextureRequest()
+        {
+        });
+
+        // TODO: DBに反映
     }
 }

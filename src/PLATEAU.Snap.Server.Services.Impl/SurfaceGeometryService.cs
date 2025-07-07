@@ -1,5 +1,4 @@
-﻿using NetTopologySuite.Geometries;
-using PLATEAU.Snap.Models;
+﻿using PLATEAU.Snap.Models;
 using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Extensions.Numerics;
 using PLATEAU.Snap.Models.Server;
@@ -12,23 +11,29 @@ namespace PLATEAU.Snap.Server.Services;
 
 internal class SurfaceGeometryService : ISurfaceGeometryService
 {
+    private const int ExpiryInMinutes = 60;
+
+    private const int ThumbnailWidth = 300;
+
+    private const int ThumbnailHeight = 300;
+
     private readonly ISurfaceGeometryRepository repository;
 
     private readonly ICityBoundaryRepository cityBoundaryRepository;
 
     private readonly IImageRepository imageRepository;
 
+    private readonly IImageProcessingService imageProcessingService;
+
     private readonly Grid grid;
 
-    private readonly GeometryFactory geometryFactory;
-
-    public SurfaceGeometryService(ISurfaceGeometryRepository repository, ICityBoundaryRepository cityBoundaryRepository, IImageRepository imageRepository, Grid grid, GeometryFactory geometryFactory)
+    public SurfaceGeometryService(ISurfaceGeometryRepository repository, ICityBoundaryRepository cityBoundaryRepository, IImageRepository imageRepository, IImageProcessingService imageProcessingService, Grid grid)
     {
         this.repository = repository;
         this.cityBoundaryRepository = cityBoundaryRepository;
         this.imageRepository = imageRepository;
+        this.imageProcessingService = imageProcessingService;
         this.grid = grid;
-        this.geometryFactory = geometryFactory;
     }
 
     public async Task<Models.Client.VisibleSurfacesResponse> GetVisibleSurfacesAsync(VisibleSurfacesRequest request)
@@ -67,7 +72,7 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
         try
         {
             using var stream = request.File.OpenReadStream();
-            var thumbnailBytes = CreateThumbnailAsBytes(stream, 150, 150);
+            var thumbnailBytes = CreateThumbnailAsBytes(stream, ThumbnailWidth, ThumbnailHeight);
 
             var entity = await this.imageRepository.CreateAsync(new Entities.Models.Image(request.Metadata, thumbnailBytes), stream);
             return new Models.Client.BuildingImageResponse()
@@ -107,36 +112,26 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
 
     public async Task<Models.Client.TransformResponse> TransformAsync(Models.Client.TransformRequest payload)
     {
-        // Mock実装
-        var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync("42.png", 60);
-        var polygon = geometryFactory.CreatePolygon(
-        [
-            new Coordinate(77, 725),
-            new Coordinate(77, 1790),
-            new Coordinate(1100, 1790),
-            new Coordinate(1100, 725),
-            new Coordinate(77, 725)
-        ]);
-        return new Models.Client.TransformResponse(Models.Client.StatusType.Success, "S3://temp/42.png", preSignedURL, polygon);
+        // TODO: パラメータ構築
+        var response = await imageProcessingService.TransformAsync(new Models.Lambda.LambdaTransformRequest()
+        {
+        });
+
+        var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync(response.Path, ExpiryInMinutes);
+
+        return new Models.Client.TransformResponse(response.Path, preSignedURL, response.Coordinates);
     }
 
     public async Task<Models.Client.RoofExtractionResponse> RoofExtractionAsync(Models.Client.RoofExtractionRequest payload)
     {
-        // Mock実装
-        var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync("103251.png", 60);
-        var polygon = geometryFactory.CreatePolygon(
-        [
-            new Coordinate(105,40),
-            new Coordinate(93,101),
-            new Coordinate(233,133),
-            new Coordinate(244,82),
-            new Coordinate(212,75),
-            new Coordinate(205,103),
-            new Coordinate(143,91),
-            new Coordinate(152,50),
-            new Coordinate(105,40)
-        ]);
-        return new Models.Client.RoofExtractionResponse(Models.Client.StatusType.Success, "S3://temp/103251.png", preSignedURL, polygon);
+        // TODO: パラメータ構築
+        var response = await imageProcessingService.RoofExtractionAsync(new Models.Lambda.LambdaRoofExtractionRequest()
+        {
+        });
+
+        var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync(response.Path, ExpiryInMinutes);
+
+        return new Models.Client.RoofExtractionResponse(response.Path, preSignedURL, response.Coordinates);
     }
 
     private static byte[] CreateThumbnailAsBytes(Stream inputStream, int width, int height)

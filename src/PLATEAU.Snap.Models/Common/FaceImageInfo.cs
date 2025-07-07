@@ -40,7 +40,7 @@ public class FaceImageInfo
         Gmlid = gmlid;
         if (thumbnailBytes is not null)
         {
-            Thumbnail = Convert.ToBase64String(thumbnailBytes);
+            Thumbnail = $"data:image/jpeg;base64,{Convert.ToBase64String(thumbnailBytes)}";
         }
         IsOrtho = isOrtho;
     }

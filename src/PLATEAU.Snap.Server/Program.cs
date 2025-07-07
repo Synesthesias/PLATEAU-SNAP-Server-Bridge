@@ -65,6 +65,14 @@ else
     grid = geoidoReader.Read();
 }
 
+// Lambda
+var lambdaSettings = new LambdaSettings()
+{
+    TransformFunctionName = configuration.GetValue<string>("TransformFunctionName") ?? throw new ArgumentNullException("TransformFunctionName"),
+    RoofExtractionFunctionName = configuration.GetValue<string>("RoofExtractionFunctionName") ?? throw new ArgumentNullException("RoofExtractionFunctionName"),
+    ApplyTextureFunctionName = configuration.GetValue<string>("ApplyTextureFunctionName") ?? throw new ArgumentNullException("ApplyTextureFunctionName"),
+};
+
 // Add services to the container.
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton(grid);
@@ -95,12 +103,14 @@ builder.Services.AddDbContext<CitydbV4DbContext>(options =>
     builder.Database = databaseSettings.Database;
     options.UseNpgsql(builder.ConnectionString, o => o.UseNetTopologySuite());
     options.UseLoggerFactory(LoggerFactory.Create(builder => builder.AddConsole()));
+    options.UseSnakeCaseNamingConvention();
     if (!isDevelopment)
     {
         //options.EnableSensitiveDataLogging();
     }
 });
 builder.Services.AddSingleton(s3Settings);
+builder.Services.AddSingleton(lambdaSettings);
 builder.Services.AddSingleton(new GeometryFactory());
 
 // Exception Handler

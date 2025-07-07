@@ -6,5 +6,5 @@ public interface IStorageRepository
 {
     Task<StorageUploadResponse> UploadAsync(Stream stream, string path);
 
-    Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes);
+    Task<string> GeneratePreSignedURLAsync(string path, int expiryInMinutes);
 }

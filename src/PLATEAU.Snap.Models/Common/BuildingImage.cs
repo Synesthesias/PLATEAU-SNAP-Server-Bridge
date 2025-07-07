@@ -1,5 +1,7 @@
 ﻿using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace PLATEAU.Snap.Models.Common;
 
@@ -15,26 +17,17 @@ public class BuildingImage
 
     [Required]
     [SwaggerSchema("サムネイル画像", ReadOnly = true, Nullable = false)]
-    public string? Thumbnail { get; set; } = null!;
+    [NotMapped]
+    public string? Thumbnail => ThumbnailBytes != null ? $"data:image/jpeg;base64,{Convert.ToBase64String(ThumbnailBytes)}" : null;
 
     [Required]
     [SwaggerSchema("住所", ReadOnly = true, Nullable = false)]
     public string Address { get; set; } = null!;
 
+    [JsonIgnore]
+    public byte[] ThumbnailBytes { get; set; } = null!;
+
     public BuildingImage()
     {
-    }
-
-    public BuildingImage(int id, string? gmlid, byte[] thumbnailBytes, string address)
-    {
-        if (string.IsNullOrEmpty(gmlid))
-        {
-            throw new ArgumentNullException(nameof(gmlid));
-        }
-
-        Id = id;
-        Gmlid = gmlid;
-        Thumbnail = Convert.ToBase64String(thumbnailBytes);
-        Address = address;
     }
 }

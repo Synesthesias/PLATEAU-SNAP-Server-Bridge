@@ -1,17 +1,10 @@
-﻿using NetTopologySuite.Geometries;
-using NetTopologySuite.IO;
-using Swashbuckle.AspNetCore.Annotations;
+﻿using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 
 namespace PLATEAU.Snap.Models.Client;
 
 public class TransformResponse
 {
-    [Required]
-    [SwaggerSchema("結果のステータス", ReadOnly = true, Nullable = false)]
-    public StatusType Status { get; set; }
-
     [Required]
     [SwaggerSchema("画像のパス", ReadOnly = true, Nullable = true)]
     public string? Path { get; set; }
@@ -24,24 +17,14 @@ public class TransformResponse
     [SwaggerSchema("座標情報 (WKT形式)", ReadOnly = true, Nullable = true)]
     public string? Coordinates { get; set; }
 
-    [JsonIgnore]
-    public NetTopologySuite.Geometries.Polygon? Polygon { get; set; }
-
     public TransformResponse()
     {
     }
 
-    public TransformResponse(StatusType status, string? path, string? uri, Polygon? polygon)
+    public TransformResponse(string? path, string? uri, string? coordinates)
     {
-        Status = status;
         Path = path;
         Uri = uri;
-        Polygon = polygon;
-
-        if (polygon != null)
-        {
-            var writer = new WKTWriter();
-            Coordinates = writer.Write(polygon);
-        }
+        Coordinates = coordinates;
     }
 }

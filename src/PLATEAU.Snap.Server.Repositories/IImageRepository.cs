@@ -6,5 +6,5 @@ public interface IImageRepository
 {
     Task<Image> CreateAsync(Image image, Stream stream);
 
-    Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes);
+    Task<string> GeneratePreSignedURLAsync(string path, int expiryInMinutes);
 }

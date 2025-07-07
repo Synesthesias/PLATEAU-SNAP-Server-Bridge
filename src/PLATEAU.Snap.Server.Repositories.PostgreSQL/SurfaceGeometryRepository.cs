@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using Npgsql;
 using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Extensions.Geometries;
 using PLATEAU.Snap.Models.Server;
@@ -28,7 +29,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
             await connection.OpenAsync();
         }
 
-        // 事前に surface_centroid に lod1 の surface のみ登録しているため、このクエリで lod1 の面を取得できる
+        // 事前に surface_centroid に lod2 の surface のみ登録しているため、このクエリで lod2 の面を取得できる
         using var command = connection.CreateCommand();
         command.CommandText = @"
             WITH t1 AS (
@@ -59,12 +60,12 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
             SELECT id, gmlid, geom, plane_geom FROM t2
             WHERE degrees <= @field_of_view
             ORDER BY distance";
-        command.Parameters.Add(command.CreateParameter("@srid", srid));
-        command.Parameters.Add(command.CreateParameter("@from_point_2d", request.From.ToWkt2D()));
-        command.Parameters.Add(command.CreateParameter("@to_point_2d", request.To.ToWkt2D()));
-        command.Parameters.Add(command.CreateParameter("@min_distance", request.MinDistance));
-        command.Parameters.Add(command.CreateParameter("@max_distance", request.MaxDistance));
-        command.Parameters.Add(command.CreateParameter("@field_of_view", request.FieldOfView / 2));
+        command.Parameters.Add(command.CreateParameter("srid", srid));
+        command.Parameters.Add(command.CreateParameter("from_point_2d", request.From.ToWkt2D()));
+        command.Parameters.Add(command.CreateParameter("to_point_2d", request.To.ToWkt2D()));
+        command.Parameters.Add(command.CreateParameter("min_distance", request.MinDistance));
+        command.Parameters.Add(command.CreateParameter("max_distance", request.MaxDistance));
+        command.Parameters.Add(command.CreateParameter("field_of_view", request.FieldOfView / 2));
 
         var list = new List<PolygonInfo>();
         using var reader = await command.ExecuteReaderAsync();
@@ -96,9 +97,9 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
             SELECT
               ST_Transform(ST_SetSRID(ST_GeomFromText(@from), 6697), @srid), 
               ST_Transform(ST_SetSRID(ST_GeomFromText(@to), 6697), @srid)";
-        command.Parameters.Add(command.CreateParameter("@srid", srid));
-        command.Parameters.Add(command.CreateParameter("@from", request.From.ToWkt()));
-        command.Parameters.Add(command.CreateParameter("@to", request.To.ToWkt()));
+        command.Parameters.Add(command.CreateParameter("srid", srid));
+        command.Parameters.Add(command.CreateParameter("from", request.From.ToWkt()));
+        command.Parameters.Add(command.CreateParameter("to", request.To.ToWkt()));
 
         using var reader = await command.ExecuteReaderAsync();
         await reader.ReadAsync();
@@ -110,76 +111,57 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
     public async Task<PageList<BuildingImage>> GetBuildingsAsync(SortType sortType, int pageNumber, int pageSize)
     {
-        var connection = Context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-        {
-            await connection.OpenAsync();
-        }
-
-        using var countCommand = connection.CreateCommand();
-        countCommand.CommandText = @"
-            SELECT count(*) FROM(SELECT distinct building_id FROM surface_images)";
-
-#pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
-        var count = (long)await countCommand.ExecuteScalarAsync();
-#pragma warning restore CS8605 // null の可能性がある値をボックス化解除しています。
-
-        if (count == 0)
-        {
-            return new PageList<BuildingImage>(new List<BuildingImage>(), 0, pageNumber, pageSize);
-        }
-
-        using var command = connection.CreateCommand();
-        command.CommandText = @$"
+        var query = Context.Database.SqlQueryRaw<BuildingImage>(@$"
             SELECT
-              distinct 
-              building_id,
+              DISTINCT ON (building_id)
+              building_id AS id,
               gmlid,
-              thumbnail,
+              thumbnail AS thumbnail_bytes,
               CASE WHEN ken_name IS NOT NULL THEN ken_name ELSE '' END ||
               CASE WHEN sityo_name IS NOT NULL THEN sityo_name ELSE '' END ||
               CASE WHEN gst_name IS NOT NULL THEN gst_name ELSE '' END ||
               CASE WHEN css_name IS NOT NULL THEN css_name ELSE '' END ||
               CASE WHEN moji IS NOT NULL THEN moji ELSE '' END AS address
             FROM surface_images
-            LEFT OUTER JOIN town_boundary AS tb ON ST_Intersects(center, tb.geom)
-            ORDER BY building_id {(sortType == SortType.id_asc ? "ASC" : "DESC")}
-            LIMIT @limit OFFSET @offset";
-        command.Parameters.Add(command.CreateParameter("@limit", pageSize));
-        command.Parameters.Add(command.CreateParameter("@offset", (pageNumber - 1) * pageSize));
+            LEFT OUTER JOIN town_boundary AS tb ON ST_Intersects(center, tb.geom)");
 
-        var list = new List<BuildingImage>();
-        using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        query = sortType switch
         {
-            var id = reader.GetInt32(0);
-            var gmlId = reader.GetString(1);
-            var thumbnail = !(await reader.IsDBNullAsync(2)) ? await reader.GetFieldValueAsync<byte[]>(2) : throw new InvalidOperationException();
-            var address = !(await reader.IsDBNullAsync(3)) ? reader.GetString(3) : "住所不明";
-            list.Add(new BuildingImage(id, gmlId, thumbnail, address));
-        }
+            SortType.id_asc => query.OrderBy(x => x.Id),
+            SortType.id_desc => query.OrderByDescending(x => x.Id),
+            _ => throw new ArgumentOutOfRangeException(nameof(sortType), sortType, null)
+        };
 
-        return new PageList<BuildingImage>(list, (int)count, pageNumber, pageSize);
+        return await PageList<BuildingImage>.ToPageListAsync(query, pageNumber, pageSize);
     }
 
     public async Task<PageList<BuildingFace>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
     {
-        var query = Context.BuildingFaces
-            .Where(x => x.BuildingId == buildingId)
-            .GroupBy(x => x.FaceId).Select(g => g.First());
+        var param = new NpgsqlParameter("buildingId", buildingId);
+        var query = Context.Database.SqlQueryRaw<BuildingFace>(@$"
+            WITH ranked AS (
+              SELECT
+                bf.*,
+                ROW_NUMBER() OVER (
+                  PARTITION BY building_id, face_id
+                  ORDER BY timestamp DESC NULLS LAST
+                ) AS rn
+              FROM building_faces bf
+            ),
+            t AS(
+              SELECT * FROM ranked WHERE rn = 1
+            )
+            SELECT building_id, face_id, image_id, gmlid, is_ortho, thumbnail, coordinates, timestamp FROM t
+            WHERE building_id = @buildingId", param);
 
-        var count = await query.CountAsync();
-        var items = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
-
-        // GroupBy を使ったあとに IQueryable のままソートすると例外がスローされるためメモリ上でソートする
-        var orderdItems = sortType switch
+        query = sortType switch
         {
-            SortType.id_asc => items.OrderBy(x => x.IsOrtho).ThenBy(x => x.FaceId),
-            SortType.id_desc => items.OrderBy(x => x.IsOrtho).ThenByDescending(x => x.FaceId),
+            SortType.id_asc => query.OrderBy(x => x.IsOrtho).ThenBy(x => x.FaceId),
+            SortType.id_desc => query.OrderBy(x => x.IsOrtho).ThenByDescending(x => x.FaceId),
             _ => throw new ArgumentOutOfRangeException(nameof(sortType), sortType, null)
         };
 
-        return new PageList<BuildingFace>(orderdItems.ToList(), count, pageNumber, pageSize);
+        return await PageList<BuildingFace>.ToPageListAsync(query, pageNumber, pageSize);
     }
 
     public async Task<PageList<BuildingFace>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)

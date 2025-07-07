@@ -52,8 +52,8 @@ internal class ImageRepository : BaseRepository, IImageRepository
         }
     }
 
-    public Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes)
+    public Task<string> GeneratePreSignedURLAsync(string path, int expiryInMinutes)
     {
-        return this.storage.GeneratePreSignedURLAsync(objectKey, expiryInMinutes);
+        return this.storage.GeneratePreSignedURLAsync(path, expiryInMinutes);
     }
 }

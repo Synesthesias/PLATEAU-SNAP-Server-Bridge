@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using PLATEAU.Snap.Models.Exceptions;
 using System.Diagnostics;
 
 namespace PLATEAU.Snap.Server.Filters;
@@ -35,6 +36,8 @@ public class ApiExceptionFilter : ExceptionFilterAttribute
                 return CreateBadRequest(httpContext, ex);
             case TaskCanceledException:
                 return CreateClientClosedRequest(httpContext, ex);
+            case LambdaOperationException:
+                return CreateInternalServerErrorForLambda(httpContext, ex);
             default:
                 return CreateInternalServerError(httpContext, ex);
         }
@@ -118,6 +121,22 @@ public class ApiExceptionFilter : ExceptionFilterAttribute
         problem.Extensions["traceId"] = Activity.Current?.Id ?? httpContext.TraceIdentifier;
 
         return new ObjectResult(problem) { StatusCode = StatusCodes.Status499ClientClosedRequest };
+    }
+
+    public static ActionResult CreateInternalServerErrorForLambda(HttpContext httpContext, Exception ex)
+    {
+        var problem = new ProblemDetails()
+        {
+            Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+            Title = "Internal Server Error (Lambda)",
+            Status = StatusCodes.Status500InternalServerError,
+            Detail = ex.Message,
+            Instance = httpContext.Request.Path,
+        };
+
+        problem.Extensions["traceId"] = Activity.Current?.Id ?? httpContext.TraceIdentifier;
+
+        return new ObjectResult(problem) { StatusCode = StatusCodes.Status500InternalServerError };
     }
 
     public static ActionResult CreateInternalServerError(HttpContext httpContext, Exception ex)

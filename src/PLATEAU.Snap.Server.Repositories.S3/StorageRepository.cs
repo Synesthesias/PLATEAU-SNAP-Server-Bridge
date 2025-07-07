@@ -3,11 +3,14 @@ using Amazon.S3.Model;
 using Amazon.S3.Transfer;
 using PLATEAU.Snap.Models.Server;
 using System.Net;
+using System.Text.RegularExpressions;
 
 namespace PLATEAU.Snap.Server.Repositories;
 
 internal class StorageRepository : IStorageRepository
 {
+    private static readonly Regex pattern = new Regex(@"^s3://(?<bucket>[^/]+)/(?<key>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private readonly IAmazonS3 amazonS3;
 
     private readonly S3Settings s3Settings;
@@ -53,12 +56,41 @@ internal class StorageRepository : IStorageRepository
         }
     }
 
-    public async Task<string> GeneratePreSignedURLAsync(string objectKey, int expiryInMinutes)
+    public async IAsyncEnumerable<byte[]> DownloadAsync(string path)
     {
+        var match = pattern.Match(path);
+        if (!match.Success)
+        {
+            throw new ArgumentException($"Invalid S3 path format: {path}", nameof(path));
+        }
+
+        var request = new GetObjectRequest
+        {
+            BucketName = match.Groups["bucket"].Value,
+            Key = match.Groups["key"].Value
+        };
+
+        using var response = await amazonS3.GetObjectAsync(request);
+        var buffer = new byte[81920]; // 80 KB buffer size
+        int bytesRead;
+        while ((bytesRead = await response.ResponseStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            yield return buffer.Take(bytesRead).ToArray();
+        }
+    }
+
+    public async Task<string> GeneratePreSignedURLAsync(string path, int expiryInMinutes)
+    {
+        var match = pattern.Match(path);
+        if (!match.Success)
+        {
+            throw new ArgumentException($"Invalid S3 path format: {path}", nameof(path));
+        }
+
         var request = new GetPreSignedUrlRequest
         {
-            BucketName = this.s3Settings.Bucket,
-            Key = objectKey,
+            BucketName = match.Groups["bucket"].Value,
+            Key = match.Groups["key"].Value,
             Expires = DateTime.UtcNow.AddMinutes(expiryInMinutes),
             Verb = HttpVerb.GET
         };
