@@ -12,9 +12,9 @@ terraform {
     }
   }
   backend "s3" {
-    region  = "<Terraform Backend Region>"
-    bucket  = "<Terraform Backend Bucket>"
-    key     = "<Terraform Backend Path To the State File>"
+    region  = "ap-northeast-1"
+    bucket  = "plateausnap-terraform"
+    key     = "dev/terraform.tfstate"
     encrypt = true
   }
 }

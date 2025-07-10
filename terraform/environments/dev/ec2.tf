@@ -38,9 +38,7 @@ resource "aws_key_pair" "ec2" {
   public_key = tls_private_key.private_key.public_key_openssh
 }
 
-data "template_file" "user_data" {
-  template = file("../../script/init.sh")
-}
+
 
 resource "aws_instance" "app_server" {
   # ami                         = data.aws_ami.app.id
@@ -51,7 +49,7 @@ resource "aws_instance" "app_server" {
     aws_security_group.ec2.id
   ]
   key_name  = "${local.app_name}-ec2-key-pair"
-  user_data = base64encode(data.template_file.user_data.rendered)
+  user_data = filebase64("../../script/init.sh")
   lifecycle {
     ignore_changes = [
       user_data
