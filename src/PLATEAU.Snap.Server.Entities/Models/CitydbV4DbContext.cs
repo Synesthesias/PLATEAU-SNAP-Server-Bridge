@@ -30,9 +30,15 @@ public partial class CitydbV4DbContext : DbContext
 
     public virtual DbSet<RoofSurface> RoofSurfaces { get; set; }
 
+    public virtual DbSet<SurfaceDatum> SurfaceData { get; set; }
+
     public virtual DbSet<SurfaceGeometry> SurfaceGeometries { get; set; }
 
     public virtual DbSet<SurfaceImage> SurfaceImages { get; set; }
+
+    public virtual DbSet<TexImage> TexImages { get; set; }
+
+    public virtual DbSet<Textureparam> Textureparams { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -405,9 +411,82 @@ public partial class CitydbV4DbContext : DbContext
 
             entity.Property(e => e.BuildingId).HasColumnName("building_id");
             entity.Property(e => e.FaceId).HasColumnName("face_id");
+            entity.Property(e => e.Geom)
+                .HasColumnType("geometry(PolygonZ,6697)")
+                .HasColumnName("geom");
             entity.Property(e => e.Gmlid)
                 .HasMaxLength(256)
                 .HasColumnName("gmlid");
+        });
+
+        modelBuilder.Entity<SurfaceDatum>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("surface_data_pk");
+
+            entity.ToTable("surface_data", "citydb");
+
+            entity.HasIndex(e => new { e.Gmlid, e.GmlidCodespace }, "surface_data_inx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.ObjectclassId, "surface_data_objclass_fkx");
+
+            entity.HasIndex(e => e.GtReferencePoint, "surface_data_spx").HasMethod("gist");
+
+            entity.HasIndex(e => e.TexImageId, "surface_data_tex_image_fkx");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('surface_data_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.Description)
+                .HasMaxLength(4000)
+                .HasColumnName("description");
+            entity.Property(e => e.Gmlid)
+                .HasMaxLength(256)
+                .HasColumnName("gmlid");
+            entity.Property(e => e.GmlidCodespace)
+                .HasMaxLength(1000)
+                .HasColumnName("gmlid_codespace");
+            entity.Property(e => e.GtOrientation)
+                .HasMaxLength(256)
+                .HasColumnName("gt_orientation");
+            entity.Property(e => e.GtPreferWorldfile).HasColumnName("gt_prefer_worldfile");
+            entity.Property(e => e.GtReferencePoint)
+                .HasColumnType("geometry(Point,6697)")
+                .HasColumnName("gt_reference_point");
+            entity.Property(e => e.IsFront).HasColumnName("is_front");
+            entity.Property(e => e.Name)
+                .HasMaxLength(1000)
+                .HasColumnName("name");
+            entity.Property(e => e.NameCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("name_codespace");
+            entity.Property(e => e.ObjectclassId).HasColumnName("objectclass_id");
+            entity.Property(e => e.TexBorderColor)
+                .HasMaxLength(256)
+                .HasColumnName("tex_border_color");
+            entity.Property(e => e.TexImageId).HasColumnName("tex_image_id");
+            entity.Property(e => e.TexTextureType)
+                .HasMaxLength(256)
+                .HasColumnName("tex_texture_type");
+            entity.Property(e => e.TexWrapMode)
+                .HasMaxLength(256)
+                .HasColumnName("tex_wrap_mode");
+            entity.Property(e => e.X3dAmbientIntensity).HasColumnName("x3d_ambient_intensity");
+            entity.Property(e => e.X3dDiffuseColor)
+                .HasMaxLength(256)
+                .HasColumnName("x3d_diffuse_color");
+            entity.Property(e => e.X3dEmissiveColor)
+                .HasMaxLength(256)
+                .HasColumnName("x3d_emissive_color");
+            entity.Property(e => e.X3dIsSmooth).HasColumnName("x3d_is_smooth");
+            entity.Property(e => e.X3dShininess).HasColumnName("x3d_shininess");
+            entity.Property(e => e.X3dSpecularColor)
+                .HasMaxLength(256)
+                .HasColumnName("x3d_specular_color");
+            entity.Property(e => e.X3dTransparency).HasColumnName("x3d_transparency");
+
+            entity.HasOne(d => d.TexImage).WithMany(p => p.SurfaceData)
+                .HasForeignKey(d => d.TexImageId)
+                .HasConstraintName("surface_data_tex_image_fk");
         });
 
         modelBuilder.Entity<SurfaceGeometry>(entity =>
@@ -481,6 +560,59 @@ public partial class CitydbV4DbContext : DbContext
             entity.Property(e => e.ImageId).HasColumnName("image_id");
             entity.Property(e => e.Thumbnail).HasColumnName("thumbnail");
             entity.Property(e => e.Timestamp).HasColumnName("timestamp");
+            entity.Property(e => e.Uri)
+                .HasMaxLength(256)
+                .HasColumnName("uri");
+        });
+
+        modelBuilder.Entity<TexImage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tex_image_pk");
+
+            entity.ToTable("tex_image", "citydb");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('tex_image_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.TexImageData).HasColumnName("tex_image_data");
+            entity.Property(e => e.TexImageUri)
+                .HasMaxLength(4000)
+                .HasColumnName("tex_image_uri");
+            entity.Property(e => e.TexMimeType)
+                .HasMaxLength(256)
+                .HasColumnName("tex_mime_type");
+            entity.Property(e => e.TexMimeTypeCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("tex_mime_type_codespace");
+        });
+
+        modelBuilder.Entity<Textureparam>(entity =>
+        {
+            entity.HasKey(e => new { e.SurfaceGeometryId, e.SurfaceDataId }).HasName("textureparam_pk");
+
+            entity.ToTable("textureparam", "citydb");
+
+            entity.HasIndex(e => e.SurfaceGeometryId, "texparam_geom_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.SurfaceDataId, "texparam_surface_data_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.Property(e => e.SurfaceGeometryId).HasColumnName("surface_geometry_id");
+            entity.Property(e => e.SurfaceDataId).HasColumnName("surface_data_id");
+            entity.Property(e => e.IsTextureParametrization).HasColumnName("is_texture_parametrization");
+            entity.Property(e => e.TextureCoordinates)
+                .HasColumnType("geometry(Polygon)")
+                .HasColumnName("texture_coordinates");
+            entity.Property(e => e.WorldToTexture)
+                .HasMaxLength(1000)
+                .HasColumnName("world_to_texture");
+
+            entity.HasOne(d => d.SurfaceData).WithMany(p => p.Textureparams)
+                .HasForeignKey(d => d.SurfaceDataId)
+                .HasConstraintName("texparam_surface_data_fk");
+
+            entity.HasOne(d => d.SurfaceGeometry).WithMany(p => p.Textureparams)
+                .HasForeignKey(d => d.SurfaceGeometryId)
+                .HasConstraintName("texparam_geom_fk");
         });
         modelBuilder.HasSequence("address_seq", "citydb")
             .HasMin(0L)

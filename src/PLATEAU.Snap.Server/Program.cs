@@ -66,12 +66,14 @@ else
 }
 
 // Lambda
-var lambdaSettings = new LambdaSettings()
-{
-    TransformFunctionName = configuration.GetValue<string>("TransformFunctionName") ?? throw new ArgumentNullException("TransformFunctionName"),
-    RoofExtractionFunctionName = configuration.GetValue<string>("RoofExtractionFunctionName") ?? throw new ArgumentNullException("RoofExtractionFunctionName"),
-    ApplyTextureFunctionName = configuration.GetValue<string>("ApplyTextureFunctionName") ?? throw new ArgumentNullException("ApplyTextureFunctionName"),
-};
+//var lambdaSettings = new LambdaSettings()
+//{
+//    TransformFunctionName = configuration.GetValue<string>("TransformFunctionName") ?? throw new ArgumentNullException("TransformFunctionName"),
+//    RoofExtractionFunctionName = configuration.GetValue<string>("RoofExtractionFunctionName") ?? throw new ArgumentNullException("RoofExtractionFunctionName"),
+//    ApplyTextureFunctionName = configuration.GetValue<string>("ApplyTextureFunctionName") ?? throw new ArgumentNullException("ApplyTextureFunctionName"),
+//};
+
+var lambdaSettings = new LambdaSettings();
 
 // Add services to the container.
 builder.Services.AddHealthChecks();
@@ -111,7 +113,6 @@ builder.Services.AddDbContext<CitydbV4DbContext>(options =>
 });
 builder.Services.AddSingleton(s3Settings);
 builder.Services.AddSingleton(lambdaSettings);
-builder.Services.AddSingleton(new GeometryFactory());
 
 // Exception Handler
 builder.Services.AddProblemDetails();

@@ -1,19 +1,25 @@
-﻿using PLATEAU.Snap.Models.Client;
+﻿using NetTopologySuite.Geometries;
+using PLATEAU.Snap.Models.Client;
+using PLATEAU.Snap.Models.Exceptions;
 using PLATEAU.Snap.Models.Settings;
+using PLATEAU.Snap.Server.Repositories;
 using System.Diagnostics;
 
 namespace PLATEAU.Snap.Server.Services;
 
 internal class CityDbService : ICityDbService
 {
+    private readonly IImageRepository imageRepository;
+
     private readonly IImageProcessingService imageProcessingService;
 
     private readonly AppSettings appSettings;
 
     private readonly DatabaseSettings databaseSettings;
 
-    public CityDbService(IImageProcessingService imageProcessingService, AppSettings appSettings, DatabaseSettings databaseSettings)
+    public CityDbService(IImageRepository imageRepository, IImageProcessingService imageProcessingService, AppSettings appSettings, DatabaseSettings databaseSettings)
     {
+        this.imageRepository = imageRepository;
         this.imageProcessingService = imageProcessingService;
         this.appSettings = appSettings;
         this.databaseSettings = databaseSettings;
@@ -77,11 +83,26 @@ internal class CityDbService : ICityDbService
 
     public async Task ApplyTextureAsync(ApplyTextureRequest payload)
     {
-        // TODO: パラメータ構築
+        var textureparam = await this.imageRepository.GetTextureparamAsync(payload.FaceId);
+        if (textureparam is null)
+        {
+            throw new NotFoundException($"Textureparam not found for FaceId: {payload.FaceId}");
+        }
+        if (textureparam.SurfaceData.TexImage is null)
+        {
+            throw new InvalidOperationException("TexImage is null in Textureparam.");
+        }
+
         var response = await imageProcessingService.ApplyTextureAsync(new Models.Lambda.LambdaApplyTextureRequest()
         {
+            Path = payload.Path,
+            Coordinates = payload.Coordinates,
         });
 
-        // TODO: DBに反映
+        var reader = new NetTopologySuite.IO.WKTReader();
+        textureparam.TextureCoordinates = reader.Read(response.TextureCoordinates) as Polygon;
+        textureparam.SurfaceData.TexImage.TexImageData = await this.imageRepository.DownloadAsync(response.Path);
+
+        await this.imageRepository.UpdateTextureparamAsync(textureparam);
     }
 }

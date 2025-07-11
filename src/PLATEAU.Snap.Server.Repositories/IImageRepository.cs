@@ -7,4 +7,10 @@ public interface IImageRepository
     Task<Image> CreateAsync(Image image, Stream stream);
 
     Task<string> GeneratePreSignedURLAsync(string path, int expiryInMinutes);
+
+    Task<byte[]> DownloadAsync(string path);
+
+    Task<Textureparam?> GetTextureparamAsync(int surfaceGeometryId);
+
+    Task UpdateTextureparamAsync(Textureparam textureparam);
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using NetTopologySuite.Geometries;
 
 namespace PLATEAU.Snap.Server.Entities.Models;
 
@@ -10,4 +11,6 @@ public partial class RoofSurface
     public int? FaceId { get; set; }
 
     public string? Gmlid { get; set; }
+
+    public Polygon? Geom { get; set; }
 }

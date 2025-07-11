@@ -1,5 +1,7 @@
-﻿using PLATEAU.Snap.Models;
+﻿using NetTopologySuite.IO;
+using PLATEAU.Snap.Models;
 using PLATEAU.Snap.Models.Common;
+using PLATEAU.Snap.Models.Exceptions;
 using PLATEAU.Snap.Models.Extensions.Numerics;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Geoid;
@@ -112,9 +114,19 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
 
     public async Task<Models.Client.TransformResponse> TransformAsync(Models.Client.TransformRequest payload)
     {
-        // TODO: パラメータ構築
+        var surfaceImage = await this.repository.GetSurfaceImageAsync(payload.BuildingId, payload.FaceId, payload.ImageId);
+        if (surfaceImage is null)
+        {
+            throw new NotFoundException();
+        }
+
+        var writer = new WKTWriter();
+        var coordinates = writer.Write(surfaceImage.Coordinates);
+
         var response = await imageProcessingService.TransformAsync(new Models.Lambda.LambdaTransformRequest()
         {
+            Path = surfaceImage.Uri!,
+            Coordinates = coordinates,
         });
 
         var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync(response.Path, ExpiryInMinutes);
@@ -124,9 +136,18 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
 
     public async Task<Models.Client.RoofExtractionResponse> RoofExtractionAsync(Models.Client.RoofExtractionRequest payload)
     {
-        // TODO: パラメータ構築
+        var roofSurface = await this.repository.GetRoofSurfaceAsync(payload.BuildingId, payload.FaceId);
+        if (roofSurface is null)
+        {
+            throw new NotFoundException();
+        }
+
+        var writer = new WKTWriter();
+        var geometry = writer.Write(roofSurface.Geom);
+
         var response = await imageProcessingService.RoofExtractionAsync(new Models.Lambda.LambdaRoofExtractionRequest()
         {
+            Geometry = geometry
         });
 
         var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync(response.Path, ExpiryInMinutes);

@@ -102,8 +102,11 @@ SELECT id, gmlid, ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometr
 CREATE INDEX IF NOT EXISTS surface_centroid_center_geom_idx ON citydb.surface_centroid USING gist (center);
 CREATE INDEX IF NOT EXISTS surface_centroid_building_id_idx ON citydb.surface_centroid (building_id);
 
+DROP view IF EXISTS building_faces;
+DROP view IF EXISTS roof_surfaces;
 DROP view IF EXISTS surface_images;
-CREATE OR REPLACE VIEW surface_images AS
+
+CREATE VIEW surface_images AS
 SELECT
   b.id AS building_id,
   sg.id AS face_id,
@@ -112,6 +115,7 @@ SELECT
   i.thumbnail,
   i.coordinates,
   i.timestamp,
+  i.uri,
   ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326)) as center
 FROM images AS i
 JOIN image_surface_relations AS r ON i.id=r.image_id
@@ -119,12 +123,12 @@ JOIN surface_geometry AS sg ON r.gmlid=sg.gmlid
 JOIN thematic_surface ts ON sg.root_id = ts.lod2_multi_surface_id
 JOIN building b ON ts.building_id = b.id;
 
-DROP view IF EXISTS roof_surfaces;
-CREATE OR REPLACE VIEW roof_surfaces AS
+CREATE VIEW roof_surfaces AS
 SELECT
   b.id AS building_id,
   sg.id AS face_id,
-  sg.gmlid
+  sg.gmlid,
+  sg.geometry As geom
 FROM surface_geometry sg
 JOIN thematic_surface ts ON sg.root_id = ts.lod2_multi_surface_id
 JOIN building b ON ts.building_id = b.id
@@ -132,8 +136,7 @@ WHERE ts.objectclass_id = (
   SELECT id FROM objectclass WHERE classname = 'BuildingRoofSurface'
 ) AND sg.parent_id IS NOT NULL;
 
-DROP view IF EXISTS building_faces;
-CREATE OR REPLACE VIEW building_faces AS
+CREATE VIEW building_faces AS
 SELECT building_id, face_id, image_id, gmlid, false AS is_ortho, thumbnail, coordinates, timestamp FROM surface_images
 UNION ALL
 SELECT building_id, face_id, NULL, gmlid, true AS is_ortho, NULL, NULL, NULL FROM roof_surfaces;

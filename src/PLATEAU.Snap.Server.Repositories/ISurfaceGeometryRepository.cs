@@ -15,4 +15,8 @@ public interface ISurfaceGeometryRepository
     Task<PageList<BuildingFace>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize);
 
     Task<PageList<BuildingFace>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize);
+
+    Task<SurfaceImage?> GetSurfaceImageAsync(int buildingId, int faceId, long imageId);
+
+    Task<RoofSurface?> GetRoofSurfaceAsync(int buildingId, int faceId);
 }

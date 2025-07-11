@@ -176,4 +176,18 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
         return await PageList<BuildingFace>.ToPageListAsync(query, pageNumber, pageSize);
     }
+
+    public async Task<SurfaceImage?> GetSurfaceImageAsync(int buildingId, int faceId, long imageId)
+    {
+        return await Context.SurfaceImages
+            .Where(x => x.BuildingId == buildingId && x.FaceId == faceId && x.ImageId == imageId)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<RoofSurface?> GetRoofSurfaceAsync(int buildingId, int faceId)
+            {
+        return await Context.RoofSurfaces
+            .Where(x => x.BuildingId == buildingId && x.FaceId == faceId)
+            .FirstOrDefaultAsync();
+    }
 }

@@ -1,6 +1,5 @@
 ﻿using Amazon.Lambda;
 using Amazon.Lambda.Model;
-using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using PLATEAU.Snap.Models;
 using PLATEAU.Snap.Models.Exceptions;
@@ -15,37 +14,15 @@ internal class ImageProcessingService : IImageProcessingService
 
     private readonly LambdaSettings lambdaSettings;
 
-    private readonly GeometryFactory geometryFactory;
-
-    public ImageProcessingService(IAmazonLambda lambda, LambdaSettings lambdaSettings, GeometryFactory geometryFactory)
+    public ImageProcessingService(IAmazonLambda lambda, LambdaSettings lambdaSettings)
     {
         this.lambda = lambda;
         this.lambdaSettings = lambdaSettings;
-        this.geometryFactory = geometryFactory;
     }
 
     public async Task<LambdaTransformResponse> TransformAsync(LambdaTransformRequest request)
     {
-        // Mock実装
-        var polygon = geometryFactory.CreatePolygon(
-        [
-            new Coordinate(77, 725),
-            new Coordinate(77, 1790),
-            new Coordinate(1100, 1790),
-            new Coordinate(1100, 725),
-            new Coordinate(77, 725)
-        ]);
-
-        var writer = new WKTWriter();
-        var coordinates = writer.Write(polygon);
-
-        var response = await Task.FromResult(new LambdaTransformResponse
-        {
-            Path = "s3://plateausnap-dev/42.png",
-            Coordinates = coordinates,
-        });
-
-        //var response = await InvokeLambdaAsync<LambdaTransformRequest, LambdaTransformResponse>(this.lambdaSettings.TransformFunctionName, request);
+        var response = await InvokeLambdaAsync<LambdaTransformRequest, LambdaTransformResponse>(this.lambdaSettings.TransformFunctionName, request);
 
         ValidateCoordinates(response.Coordinates);
 
@@ -54,30 +31,7 @@ internal class ImageProcessingService : IImageProcessingService
 
     public async Task<LambdaRoofExtractionResponse> RoofExtractionAsync(LambdaRoofExtractionRequest request)
     {
-        // Mock実装
-        var polygon = geometryFactory.CreatePolygon(
-        [
-            new Coordinate(105,40),
-            new Coordinate(93,101),
-            new Coordinate(233,133),
-            new Coordinate(244,82),
-            new Coordinate(212,75),
-            new Coordinate(205,103),
-            new Coordinate(143,91),
-            new Coordinate(152,50),
-            new Coordinate(105,40)
-        ]);
-
-        var writer = new WKTWriter();
-        var coordinates = writer.Write(polygon);
-
-        var response = await Task.FromResult(new LambdaRoofExtractionResponse
-        {
-            Path = "s3://plateausnap-dev/103251.png",
-            Coordinates = coordinates,
-        });
-
-        //var response = await InvokeLambdaAsync<LambdaRoofExtractionRequest, LambdaRoofExtractionResponse>(this.lambdaSettings.RoofExtractionFunctionName, request);
+        var response = await InvokeLambdaAsync<LambdaRoofExtractionRequest, LambdaRoofExtractionResponse>(this.lambdaSettings.RoofExtractionFunctionName, request);
 
         ValidateCoordinates(response.Coordinates);
 
@@ -86,30 +40,7 @@ internal class ImageProcessingService : IImageProcessingService
 
     public async Task<LambdaApplyTextureResponse> ApplyTextureAsync(LambdaApplyTextureRequest request)
     {
-        // Mock実装
-        var polygon = geometryFactory.CreatePolygon(
-        [
-            new Coordinate(105,40),
-            new Coordinate(93,101),
-            new Coordinate(233,133),
-            new Coordinate(244,82),
-            new Coordinate(212,75),
-            new Coordinate(205,103),
-            new Coordinate(143,91),
-            new Coordinate(152,50),
-            new Coordinate(105,40)
-        ]);
-
-        var writer = new WKTWriter();
-        var coordinates = writer.Write(polygon);
-
-        var response = await Task.FromResult(new LambdaApplyTextureResponse
-        {
-            Path = "s3://plateausnap-dev/ABC.png",
-            TextureCoordinates = coordinates,
-        });
-
-        //var response = await InvokeLambdaAsync<LambdaApplyTextureRequest, LambdaApplyTextureResponse>(this.lambdaSettings.ApplyTextureFunctionName, request);
+        var response = await InvokeLambdaAsync<LambdaApplyTextureRequest, LambdaApplyTextureResponse>(this.lambdaSettings.ApplyTextureFunctionName, request);
 
         ValidateCoordinates(response.TextureCoordinates);
 

@@ -56,4 +56,27 @@ internal class ImageRepository : BaseRepository, IImageRepository
     {
         return this.storage.GeneratePreSignedURLAsync(path, expiryInMinutes);
     }
+
+    public async Task<byte[]> DownloadAsync(string path)
+    {
+        return await this.storage.DownloadAsync(path);
+    }
+
+    public async Task<Textureparam?> GetTextureparamAsync(int surfaceGeometryId)
+    {
+        var textureparam = await Context.Textureparams
+            .AsNoTracking()
+            .Where(x => x.SurfaceGeometryId == surfaceGeometryId && x.IsTextureParametrization == 1)
+            .Include(x => x.SurfaceData)
+                .ThenInclude(x => x.TexImage)
+            .FirstOrDefaultAsync(x => x.SurfaceGeometryId == surfaceGeometryId);
+
+        return textureparam;
+    }
+
+    public async Task UpdateTextureparamAsync(Textureparam textureparam)
+    {
+        Context.Textureparams.Update(textureparam);
+        await Context.SaveChangesAsync();
+    }
 }

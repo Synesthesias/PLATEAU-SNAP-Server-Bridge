@@ -56,7 +56,7 @@ internal class StorageRepository : IStorageRepository
         }
     }
 
-    public async IAsyncEnumerable<byte[]> DownloadAsync(string path)
+    public async Task<byte[]> DownloadAsync(string path)
     {
         var match = pattern.Match(path);
         if (!match.Success)
@@ -71,12 +71,10 @@ internal class StorageRepository : IStorageRepository
         };
 
         using var response = await amazonS3.GetObjectAsync(request);
-        var buffer = new byte[81920]; // 80 KB buffer size
-        int bytesRead;
-        while ((bytesRead = await response.ResponseStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-        {
-            yield return buffer.Take(bytesRead).ToArray();
-        }
+        var memoryStream = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(memoryStream);
+
+        return memoryStream.ToArray();
     }
 
     public async Task<string> GeneratePreSignedURLAsync(string path, int expiryInMinutes)

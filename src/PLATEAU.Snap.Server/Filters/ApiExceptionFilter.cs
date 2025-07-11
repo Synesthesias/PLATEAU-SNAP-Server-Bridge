@@ -34,6 +34,8 @@ public class ApiExceptionFilter : ExceptionFilterAttribute
             case InvalidCastException:
             case InvalidOperationException:
                 return CreateBadRequest(httpContext, ex);
+            case NotFoundException:
+                return CreateNotFound(httpContext, ex);
             case TaskCanceledException:
                 return CreateClientClosedRequest(httpContext, ex);
             case LambdaOperationException:

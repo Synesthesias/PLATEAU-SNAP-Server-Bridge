@@ -20,5 +20,7 @@ public partial class SurfaceImage
 
     public DateTime? Timestamp { get; set; }
 
+    public string? Uri { get; set; }
+
     public Geometry? Center { get; set; }
 }

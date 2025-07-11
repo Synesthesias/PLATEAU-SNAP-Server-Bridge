@@ -61,4 +61,6 @@ public partial class SurfaceGeometry
     public virtual SurfaceGeometry? Parent { get; set; }
 
     public virtual SurfaceGeometry? Root { get; set; }
+
+    public virtual ICollection<Textureparam> Textureparams { get; set; } = new List<Textureparam>();
 }
