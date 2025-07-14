@@ -1,6 +1,6 @@
 ﻿namespace PLATEAU.Snap.Models.Lambda;
 
-public class LambdaTransformResponse
+public class LambdaTransformResponse : LambdaResponseBody
 {
     /// <summary>
     /// 画像のパス

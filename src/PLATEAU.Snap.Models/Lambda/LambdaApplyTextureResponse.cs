@@ -1,6 +1,6 @@
 ﻿namespace PLATEAU.Snap.Models.Lambda;
 
-public class LambdaApplyTextureResponse
+public class LambdaApplyTextureResponse : LambdaResponseBody
 {
     /// <summary>
     /// 画像のパス

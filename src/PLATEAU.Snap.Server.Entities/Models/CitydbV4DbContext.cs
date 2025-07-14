@@ -411,9 +411,7 @@ public partial class CitydbV4DbContext : DbContext
 
             entity.Property(e => e.BuildingId).HasColumnName("building_id");
             entity.Property(e => e.FaceId).HasColumnName("face_id");
-            entity.Property(e => e.Geom)
-                .HasColumnType("geometry(PolygonZ,6697)")
-                .HasColumnName("geom");
+            entity.Property(e => e.Geom).HasColumnName("geom");
             entity.Property(e => e.Gmlid)
                 .HasMaxLength(256)
                 .HasColumnName("gmlid");

@@ -12,5 +12,5 @@ public partial class RoofSurface
 
     public string? Gmlid { get; set; }
 
-    public Polygon? Geom { get; set; }
+    public Geometry? Geom { get; set; }
 }

@@ -47,7 +47,7 @@ internal class ImageProcessingService : IImageProcessingService
         return response;
     }
 
-    private async Task<TResponse> InvokeLambdaAsync<TRequest, TResponse>(string functionName, TRequest request)
+    private async Task<TResponse> InvokeLambdaAsync<TRequest, TResponse>(string functionName, TRequest request) where TResponse : LambdaResponseBody
     {
         var invokeRequest = new InvokeRequest
         {
@@ -59,18 +59,31 @@ internal class ImageProcessingService : IImageProcessingService
         var invokeResponse = await this.lambda.InvokeAsync(invokeRequest);
         if (invokeResponse.HttpStatusCode != System.Net.HttpStatusCode.OK)
         {
-            throw new LambdaOperationException($"Lambda function invocation failed with status code: {invokeResponse.HttpStatusCode}");
+            using var errorReader = new StreamReader(invokeResponse.Payload);
+            var errorJson = await errorReader.ReadToEndAsync();
+            var errorResponse = Util.Deserialize<LambdaErrorResponse>(errorJson);
+            throw new LambdaOperationException($"Lambda function invocation failed: [{invokeResponse.HttpStatusCode}]{errorResponse?.ErrorMessage ?? "Unknown error"}");
         }
 
         using var reader = new StreamReader(invokeResponse.Payload);
         var json = await reader.ReadToEndAsync();
-        var response = Util.Deserialize<TResponse>(json);
+        var response = Util.Deserialize<LambdaResponse>(json);
         if (response is null)
         {
             throw new LambdaOperationException("Failed to deserialize Lambda response.");
         }
 
-        return response;
+        var responseBody = Util.Deserialize<TResponse>(response.Body);
+        if (responseBody is null)
+        {
+            throw new LambdaOperationException("Failed to deserialize Lambda response body.");
+        }
+        if (response.StatusCode != 200)
+        {
+            throw new LambdaOperationException($"Lambda function returned an error: {responseBody?.Message ?? string.Empty}");
+        }
+
+        return responseBody;
     }
 
     private void ValidateCoordinates(string coordinates)

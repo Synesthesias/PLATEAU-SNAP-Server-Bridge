@@ -128,7 +128,7 @@ SELECT
   b.id AS building_id,
   sg.id AS face_id,
   sg.gmlid,
-  sg.geometry As geom
+  ST_Transform(ST_FlipCoordinates(ST_Force2D(sg.geometry)), 4326) As geom
 FROM surface_geometry sg
 JOIN thematic_surface ts ON sg.root_id = ts.lod2_multi_surface_id
 JOIN building b ON ts.building_id = b.id

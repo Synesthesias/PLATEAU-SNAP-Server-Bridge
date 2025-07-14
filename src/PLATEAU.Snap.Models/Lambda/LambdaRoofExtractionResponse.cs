@@ -1,6 +1,6 @@
 ﻿namespace PLATEAU.Snap.Models.Lambda;
 
-public class LambdaRoofExtractionResponse
+public class LambdaRoofExtractionResponse : LambdaResponseBody
 {
     /// <summary>
     /// 画像のパス
