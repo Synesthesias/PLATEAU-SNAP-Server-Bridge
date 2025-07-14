@@ -42,6 +42,7 @@ public class ImageInfo
         {
             Thumbnail = $"data:image/jpeg;base64,{Convert.ToBase64String(thumbnailBytes)}";
         }
+        Timestamp = timestamp;
         IsOrtho = isOrtho;
     }
 }
