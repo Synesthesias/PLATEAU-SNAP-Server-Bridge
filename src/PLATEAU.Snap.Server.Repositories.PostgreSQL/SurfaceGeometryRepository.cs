@@ -177,6 +177,26 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         return await PageList<BuildingFace>.ToPageListAsync(query, pageNumber, pageSize);
     }
 
+    public async Task<string?> GetFaceWktAsync(int faceId)
+    {
+        var connection = Context.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"
+            SELECT ST_AsText(ST_Transform(ST_FlipCoordinates(g.geometry), 6668 + cast(system_number as integer))) AS geom FROM surface_geometry AS g
+            JOIN city_boundary AS sn ON ST_Within(ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326)), sn.geom)
+            WHERE id =@id";
+        command.Parameters.Add(command.CreateParameter("id", faceId));
+
+        using var reader = await command.ExecuteReaderAsync();
+
+        return await reader.ReadAsync() && reader["geom"] != DBNull.Value ? reader["geom"].ToString() : null;
+    }
+
     public async Task<SurfaceImage?> GetSurfaceImageAsync(int buildingId, int faceId, long imageId)
     {
         return await Context.SurfaceImages

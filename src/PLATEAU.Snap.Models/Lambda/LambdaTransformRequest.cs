@@ -11,4 +11,9 @@ public class LambdaTransformRequest
     /// 画像内の建物座標 (WKT形式)
     /// </summary>
     public string Coordinates { get; set; } = null!;
+
+    /// <summary>
+    /// 面のジオメトリ (WKT形式)
+    /// </summary>
+    public string Geometry { get; set; } = null!;
 }

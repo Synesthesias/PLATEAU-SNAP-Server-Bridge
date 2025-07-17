@@ -120,6 +120,13 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
             throw new NotFoundException();
         }
 
+        // アスペクト比の計算にジオイド高は考慮する必要がないため、ここでは無視する
+        var wkt = await this.repository.GetFaceWktAsync(payload.FaceId);
+        if (wkt is null)
+        {
+            throw new InvalidOperationException($"Face geometry with ID {payload.FaceId} not found.");
+        }
+
         var writer = new WKTWriter();
         var coordinates = writer.Write(surfaceImage.Coordinates);
 
@@ -127,6 +134,7 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
         {
             Path = surfaceImage.Uri!,
             Coordinates = coordinates,
+            Geometry = wkt
         });
 
         var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync(response.Path, ExpiryInMinutes);
