@@ -210,4 +210,14 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
             .Where(x => x.BuildingId == buildingId && x.FaceId == faceId)
             .FirstOrDefaultAsync();
     }
+
+    public async Task<bool> ExistsAsync(int buildingId)
+    {
+        return await Context.SurfaceImages.AnyAsync(x => x.BuildingId == buildingId);
+    }
+
+    public async Task<bool> ExistsAsync(int buildingId, int faceId)
+    {
+        return await Context.SurfaceImages.Where(x => x.BuildingId == buildingId && x.FaceId == faceId).AnyAsync();
+    }
 }

@@ -1,5 +1,4 @@
 ﻿using NetTopologySuite.IO;
-using PLATEAU.Snap.Models;
 using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Exceptions;
 using PLATEAU.Snap.Models.Extensions.Numerics;
@@ -102,12 +101,22 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
 
     public async Task<PageData<FaceImageInfo>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
     {
+        if (!(await this.repository.ExistsAsync(buildingId)))
+        {
+            throw new NotFoundException();
+        }
+
         var pageList = await this.repository.GetFacesAsync(buildingId, sortType, pageNumber, pageSize);
         return pageList.CreatePageDataWithSelect(x => new FaceImageInfo(x.FaceId!.Value, x.Gmlid, x.Thumbnail, x.Timestamp, x.IsOrtho!.Value));
     }
 
     public async Task<PageData<ImageInfo>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)
     {
+        if (!(await this.repository.ExistsAsync(buildingId, faceId)))
+        {
+            throw new NotFoundException();
+        }
+
         var pageList = await this.repository.GetFaceImagesAsync(buildingId, faceId, sortType, pageNumber, pageSize);
         return pageList.CreatePageDataWithSelect(x => new ImageInfo(x.ImageId, x.Gmlid, x.Thumbnail, x.Timestamp, x.IsOrtho!.Value));
     }
@@ -124,7 +133,7 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
         var wkt = await this.repository.GetFaceWktAsync(payload.FaceId);
         if (wkt is null)
         {
-            throw new InvalidOperationException($"Face geometry with ID {payload.FaceId} not found.");
+            throw new InvalidOperationException("The face geometry is not available.");
         }
 
         var writer = new WKTWriter();

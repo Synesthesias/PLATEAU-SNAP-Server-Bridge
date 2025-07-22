@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using PLATEAU.Snap.Models;
+using PLATEAU.Snap.Models.Exceptions;
 using PLATEAU.Snap.Server.Entities;
 using PLATEAU.Snap.Server.Entities.Models;
 using System.Data;

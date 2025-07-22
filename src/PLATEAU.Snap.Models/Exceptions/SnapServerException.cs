@@ -1,4 +1,4 @@
-﻿namespace PLATEAU.Snap.Models;
+﻿namespace PLATEAU.Snap.Models.Exceptions;
 
 public class SnapServerException : Exception
 {

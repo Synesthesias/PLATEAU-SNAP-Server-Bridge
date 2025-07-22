@@ -49,41 +49,48 @@ internal class ImageProcessingService : IImageProcessingService
 
     private async Task<TResponse> InvokeLambdaAsync<TRequest, TResponse>(string functionName, TRequest request) where TResponse : LambdaResponseBody
     {
-        var invokeRequest = new InvokeRequest
+        try
         {
-            FunctionName = functionName,
-            Payload = Util.Serialize(request),
-            InvocationType = InvocationType.RequestResponse
-        };
+            var invokeRequest = new InvokeRequest
+            {
+                FunctionName = functionName,
+                Payload = Util.Serialize(request),
+                InvocationType = InvocationType.RequestResponse
+            };
 
-        var invokeResponse = await this.lambda.InvokeAsync(invokeRequest);
-        if (invokeResponse.HttpStatusCode != System.Net.HttpStatusCode.OK)
-        {
-            using var errorReader = new StreamReader(invokeResponse.Payload);
-            var errorJson = await errorReader.ReadToEndAsync();
-            var errorResponse = Util.Deserialize<LambdaErrorResponse>(errorJson);
-            throw new LambdaOperationException($"Lambda function invocation failed: [{invokeResponse.HttpStatusCode}]{errorResponse?.ErrorMessage ?? "Unknown error"}");
-        }
+            var invokeResponse = await this.lambda.InvokeAsync(invokeRequest);
+            if (invokeResponse.HttpStatusCode != System.Net.HttpStatusCode.OK)
+            {
+                using var errorReader = new StreamReader(invokeResponse.Payload);
+                var errorJson = await errorReader.ReadToEndAsync();
+                var errorResponse = Util.Deserialize<LambdaErrorResponse>(errorJson);
+                throw new LambdaOperationException($"Lambda function invocation failed: [{invokeResponse.HttpStatusCode}]{errorResponse?.ErrorMessage ?? "Unknown error"}");
+            }
 
-        using var reader = new StreamReader(invokeResponse.Payload);
-        var json = await reader.ReadToEndAsync();
-        var response = Util.Deserialize<LambdaResponse>(json);
-        if (response is null)
-        {
-            throw new LambdaOperationException("Failed to deserialize Lambda response.");
-        }
+            using var reader = new StreamReader(invokeResponse.Payload);
+            var json = await reader.ReadToEndAsync();
+            var response = Util.Deserialize<LambdaResponse>(json);
+            if (response is null || response.Body is null)
+            {
+                throw new LambdaOperationException("Failed to deserialize Lambda response.");
+            }
 
-        var responseBody = Util.Deserialize<TResponse>(response.Body);
-        if (responseBody is null)
-        {
-            throw new LambdaOperationException("Failed to deserialize Lambda response body.");
-        }
-        if (response.StatusCode != 200)
-        {
-            throw new LambdaOperationException($"Lambda function returned an error: {responseBody?.Message ?? string.Empty}");
-        }
+            var responseBody = Util.Deserialize<TResponse>(response.Body);
+            if (responseBody is null)
+            {
+                throw new LambdaOperationException("Failed to deserialize Lambda response body.");
+            }
+            if (response.StatusCode != 200)
+            {
+                throw new LambdaOperationException($"Lambda function returned an error: {responseBody?.Message ?? string.Empty}");
+            }
 
-        return responseBody;
+            return responseBody;
+        }
+        catch (Exception ex)
+        {
+            throw new LambdaOperationException($"Failed to invoke Lambda function '{functionName}': {ex.Message}", ex);
+        }
     }
 
     private void ValidateCoordinates(string coordinates)

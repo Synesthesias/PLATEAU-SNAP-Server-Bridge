@@ -39,6 +39,13 @@ public class PageList<T> : List<T>
         return new PageList<T>(items, count, pageNumber, pageSize);
     }
 
+    public static PageList<TResult> ToPageListWithSelect<TResult>(IQueryable<T> source, Func<T, TResult> selector, int pageNumber, int pageSize)
+    {
+        var count = source.Count();
+        var items = source.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
+        return new PageList<TResult>(items.Select(x => selector.Invoke(x)).ToList(), count, pageNumber, pageSize);
+    }
+
     public static async Task<PageList<TResult>> ToPageListWithSelectAsync<TResult>(IQueryable<T> source, Func<T, TResult> selector, int pageNumber, int pageSize)
     {
         var count = source.Count();

@@ -1,5 +1,4 @@
-﻿using NetTopologySuite.Geometries;
-using PLATEAU.Snap.Models.Common;
+﻿using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Entities.Models;
 
@@ -22,4 +21,8 @@ public interface ISurfaceGeometryRepository
     Task<SurfaceImage?> GetSurfaceImageAsync(int buildingId, int faceId, long imageId);
 
     Task<RoofSurface?> GetRoofSurfaceAsync(int buildingId, int faceId);
+
+    Task<bool> ExistsAsync(int buildingId);
+
+    Task<bool> ExistsAsync(int buildingId, int faceId);
 }
