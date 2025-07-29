@@ -28,6 +28,8 @@ public partial class CitydbV4DbContext : DbContext
 
     public virtual DbSet<ImageSurfaceRelation> ImageSurfaceRelations { get; set; }
 
+    public virtual DbSet<Objectclass> Objectclasses { get; set; }
+
     public virtual DbSet<RoofSurface> RoofSurfaces { get; set; }
 
     public virtual DbSet<SurfaceDatum> SurfaceData { get; set; }
@@ -230,6 +232,11 @@ public partial class CitydbV4DbContext : DbContext
             entity.HasOne(d => d.Lod4Solid).WithMany(p => p.BuildingLod4Solids)
                 .HasForeignKey(d => d.Lod4SolidId)
                 .HasConstraintName("building_lod4solid_fk");
+
+            entity.HasOne(d => d.Objectclass).WithMany(p => p.Buildings)
+                .HasForeignKey(d => d.ObjectclassId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("building_objectclass_fk");
         });
 
         modelBuilder.Entity<BuildingFace>(entity =>
@@ -351,6 +358,11 @@ public partial class CitydbV4DbContext : DbContext
                 .HasMaxLength(256)
                 .HasColumnName("updating_person");
             entity.Property(e => e.XmlSource).HasColumnName("xml_source");
+
+            entity.HasOne(d => d.Objectclass).WithMany(p => p.Cityobjects)
+                .HasForeignKey(d => d.ObjectclassId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("cityobject_objectclass_fk");
         });
 
         modelBuilder.Entity<Image>(entity =>
@@ -401,6 +413,42 @@ public partial class CitydbV4DbContext : DbContext
                 .HasForeignKey(d => d.ImageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("image_surface_relations_image_id_fkey");
+        });
+
+        modelBuilder.Entity<Objectclass>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("objectclass_pk");
+
+            entity.ToTable("objectclass", "citydb");
+
+            entity.HasIndex(e => e.BaseclassId, "objectclass_baseclass_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.SuperclassId, "objectclass_superclass_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedNever()
+                .HasColumnName("id");
+            entity.Property(e => e.AdeId).HasColumnName("ade_id");
+            entity.Property(e => e.BaseclassId).HasColumnName("baseclass_id");
+            entity.Property(e => e.Classname)
+                .HasMaxLength(256)
+                .HasColumnName("classname");
+            entity.Property(e => e.IsAdeClass).HasColumnName("is_ade_class");
+            entity.Property(e => e.IsToplevel).HasColumnName("is_toplevel");
+            entity.Property(e => e.SuperclassId).HasColumnName("superclass_id");
+            entity.Property(e => e.Tablename)
+                .HasMaxLength(30)
+                .HasColumnName("tablename");
+
+            entity.HasOne(d => d.Baseclass).WithMany(p => p.InverseBaseclass)
+                .HasForeignKey(d => d.BaseclassId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("objectclass_baseclass_fk");
+
+            entity.HasOne(d => d.Superclass).WithMany(p => p.InverseSuperclass)
+                .HasForeignKey(d => d.SuperclassId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("objectclass_superclass_fk");
         });
 
         modelBuilder.Entity<RoofSurface>(entity =>
@@ -481,6 +529,11 @@ public partial class CitydbV4DbContext : DbContext
                 .HasMaxLength(256)
                 .HasColumnName("x3d_specular_color");
             entity.Property(e => e.X3dTransparency).HasColumnName("x3d_transparency");
+
+            entity.HasOne(d => d.Objectclass).WithMany(p => p.SurfaceData)
+                .HasForeignKey(d => d.ObjectclassId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("surface_data_objclass_fk");
 
             entity.HasOne(d => d.TexImage).WithMany(p => p.SurfaceData)
                 .HasForeignKey(d => d.TexImageId)

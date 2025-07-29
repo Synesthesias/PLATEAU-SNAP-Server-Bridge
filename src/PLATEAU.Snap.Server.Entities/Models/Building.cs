@@ -113,4 +113,6 @@ public partial class Building
     public virtual SurfaceGeometry? Lod4MultiSurface { get; set; }
 
     public virtual SurfaceGeometry? Lod4Solid { get; set; }
+
+    public virtual Objectclass Objectclass { get; set; } = null!;
 }

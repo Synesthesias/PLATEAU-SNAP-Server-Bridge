@@ -42,5 +42,7 @@ public partial class Cityobject
 
     public virtual Building? Building { get; set; }
 
+    public virtual Objectclass Objectclass { get; set; } = null!;
+
     public virtual ICollection<SurfaceGeometry> SurfaceGeometries { get; set; } = new List<SurfaceGeometry>();
 }

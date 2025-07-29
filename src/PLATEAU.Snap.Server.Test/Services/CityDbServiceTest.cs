@@ -37,11 +37,61 @@ public class CityDbServiceTest
         await service.ApplyTextureAsync(request);
     }
 
+    [Fact(DisplayName = "テクスチャ更新 紐づくSurfaceDataが複数")]
+    [Trait("Category", "Unit")]
+    public async Task ApplyTextureRelationSurfaceDataCount2()
+    {
+        var imageRepository = new FakeImageRepository();
+        imageRepository.RelationSurfaceDataCount = 2;
+        var service = CreateService(imageRepository);
+
+        const int buildingId = 1;
+        const int faceId = 1;
+        const string path = "s3://temp/transform.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+
+        var request = new ApplyTextureRequest
+        {
+            BuildingId = buildingId,
+            FaceId = faceId,
+            Path = path,
+            Coordinates = coordinates,
+        };
+
+        await service.ApplyTextureAsync(request);
+    }
+
+    [Fact(DisplayName = "テクスチャ更新 紐づくTextureparamが存在しない")]
+    [Trait("Category", "Unit")]
+    public async Task ApplyTextureTextureparamNull()
+    {
+        var imageRepository = new FakeImageRepository();
+        imageRepository.IsTextureparamNull = true;
+        var service = CreateService(imageRepository);
+
+        const int buildingId = 1;
+        const int faceId = 1;
+        const string path = "s3://temp/transform.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+
+        var request = new ApplyTextureRequest
+        {
+            BuildingId = buildingId,
+            FaceId = faceId,
+            Path = path,
+            Coordinates = coordinates,
+        };
+
+        await service.ApplyTextureAsync(request);
+    }
+
     [Fact(DisplayName = "テクスチャ更新 指定されたIDが存在しない")]
     [Trait("Category", "Unit")]
     public async Task ApplyTextureIdNotExists()
     {
-        var service = CreateService();
+        var imageRepository = new FakeImageRepository();
+        imageRepository.HasFace = false;
+        var service = CreateService(imageRepository);
 
         const int buildingId = 1000;
         const int faceId = 1000;

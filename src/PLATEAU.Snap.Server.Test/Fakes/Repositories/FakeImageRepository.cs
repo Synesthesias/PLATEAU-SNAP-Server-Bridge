@@ -7,7 +7,13 @@ internal class FakeImageRepository : IImageRepository
 {
     public List<Textureparam> Textureparams { get; } = new ();
 
+    public bool IsTextureparamNull { get; set; }
+
     public bool IsTexImageNull { get; set; }
+
+    public bool HasFace { get; set; } = true;
+
+    public int RelationSurfaceDataCount { get; set; } = 1;
 
     public Task<Image> CreateAsync(Image image, Stream stream)
     {
@@ -26,6 +32,11 @@ internal class FakeImageRepository : IImageRepository
 
     public async Task<Textureparam?> GetTextureparamAsync(int surfaceGeometryId)
     {
+        if (IsTextureparamNull)
+        {
+            return await Task.FromResult<Textureparam?>(null);
+        }
+
         var textureparam = Textureparams.FirstOrDefault(tp => tp.SurfaceGeometryId == surfaceGeometryId);
         if (IsTexImageNull && textureparam != null)
         {
@@ -34,8 +45,28 @@ internal class FakeImageRepository : IImageRepository
         return await Task.FromResult(textureparam);
     }
 
+    public async Task<bool> FaceExists(int surfaceGeometryId)
+    {
+        return await Task.FromResult(HasFace);
+    }
+
+    public async Task<int> CountSurfaceData(int texImageId)
+    {
+        return await Task.FromResult(RelationSurfaceDataCount);
+    }
+
     public async Task UpdateTextureparamAsync(Textureparam textureparam)
     {
         await Task.CompletedTask;
+    }
+
+    public async Task AddTextureparamAsync(Textureparam textureparam)
+    {
+        await Task.CompletedTask;
+    }
+
+    public async Task<Objectclass?> GetObjectClass(string classname)
+    {
+        return await Task.FromResult(new Objectclass() { Id = 54 });
     }
 }

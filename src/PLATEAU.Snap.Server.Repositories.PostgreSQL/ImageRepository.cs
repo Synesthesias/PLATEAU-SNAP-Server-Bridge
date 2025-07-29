@@ -74,9 +74,35 @@ internal class ImageRepository : BaseRepository, IImageRepository
         return textureparam;
     }
 
+    public async Task<bool> FaceExists(int surfaceGeometryId)
+    {
+        return await Context.SurfaceGeometries
+            .AnyAsync(x => x.Id == surfaceGeometryId);
+    }
+
+    public async Task<int> CountSurfaceData(int texImageId)
+    {
+        return await Context.SurfaceData
+            .Where(x => x.TexImageId == texImageId)
+            .CountAsync();
+    }
+
     public async Task UpdateTextureparamAsync(Textureparam textureparam)
     {
         Context.Textureparams.Update(textureparam);
         await Context.SaveChangesAsync();
+    }
+
+    public async Task AddTextureparamAsync(Textureparam textureparam)
+    {
+        Context.Textureparams.Add(textureparam);
+        await Context.SaveChangesAsync();
+    }
+
+    public async Task<Objectclass?> GetObjectClass(string classname)
+    {
+        return await Context.Objectclasses
+            .Where(x => x.Classname == classname)
+            .FirstOrDefaultAsync();
     }
 }

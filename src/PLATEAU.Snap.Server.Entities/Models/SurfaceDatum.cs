@@ -50,6 +50,8 @@ public partial class SurfaceDatum
 
     public Point? GtReferencePoint { get; set; }
 
+    public virtual Objectclass Objectclass { get; set; } = null!;
+
     public virtual TexImage? TexImage { get; set; }
 
     public virtual ICollection<Textureparam> Textureparams { get; set; } = new List<Textureparam>();
