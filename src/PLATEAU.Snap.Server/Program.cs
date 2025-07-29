@@ -2,11 +2,9 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
-using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using NetTopologySuite.Geometries;
 using Npgsql;
 using PLATEAU.Snap.Models.Settings;
 using PLATEAU.Snap.Server;
@@ -14,8 +12,11 @@ using PLATEAU.Snap.Server.Entities;
 using PLATEAU.Snap.Server.Extensions.DependencyInjection;
 using PLATEAU.Snap.Server.Filters;
 using PLATEAU.Snap.Server.Geoid;
+using PLATEAU.Snap.Server.Middleware;
 using PLATEAU.Snap.Server.Repositories;
 using PLATEAU.Snap.Server.Services;
+using Serilog;
+using Serilog.Events;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -73,6 +74,30 @@ var lambdaSettings = new LambdaSettings()
    ApplyTextureFunctionName = configuration.GetValue<string>("ApplyTextureFunctionName") ?? throw new ArgumentNullException("ApplyTextureFunctionName"),
 };
 
+// logging
+var logfilePath = builder.Configuration.GetValue<string>("LogFilePath");
+var logLevel = builder.Configuration.GetValue<string>("LogLevel") ?? "Information";
+var enableRequestResponseLogging = builder.Configuration.GetValue<bool>("EnableRequestResponseLogging");
+var logEventLevel = Enum.TryParse(logLevel, true, out LogEventLevel level) ? level : LogEventLevel.Information;
+var loggerConfiguration = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .Enrich.FromLogContext()
+    .WriteTo.Console(logEventLevel);
+if (!string.IsNullOrEmpty(logfilePath))
+{
+    loggerConfiguration = loggerConfiguration.WriteTo.File(
+        logfilePath,
+        logEventLevel,
+        rollingInterval: RollingInterval.Day,
+        fileSizeLimitBytes: 10 * 1024 * 1024,
+        retainedFileCountLimit: 3,
+        rollOnFileSizeLimit: true,
+        shared: true,
+        flushToDiskInterval: TimeSpan.FromSeconds(1)
+    );
+}
+Log.Logger = loggerConfiguration.CreateLogger();
+builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddHealthChecks();
@@ -103,19 +128,13 @@ builder.Services.AddDbContext<CitydbV4DbContext>(options =>
     builder.Password = databaseSettings.Password;
     builder.Database = databaseSettings.Database;
     options.UseNpgsql(builder.ConnectionString, o => o.UseNetTopologySuite());
-    options.UseLoggerFactory(LoggerFactory.Create(builder => builder.AddConsole()));
     options.UseSnakeCaseNamingConvention();
-    if (!isDevelopment)
-    {
-        //options.EnableSensitiveDataLogging();
-    }
 });
 builder.Services.AddSingleton(s3Settings);
 builder.Services.AddSingleton(lambdaSettings);
 
 // Exception Handler
 builder.Services.AddProblemDetails();
-builder.Services.AddHttpLogging(o => o = new HttpLoggingOptions());
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -159,12 +178,6 @@ builder.Services.AddCors(options =>
      });
  });
 
-// Logging
-builder.Logging.AddSimpleConsole(options =>
-{
-    options.IncludeScopes = true;
-});
-
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -174,7 +187,11 @@ if (isDevelopment || builder.Configuration.GetValue<bool>("UseSwagger"))
     app.UseSwaggerUI();
 }
 
-app.UseHttpLogging();
+if (enableRequestResponseLogging)
+{
+    app.UseMiddleware<RequestResponseLoggingMiddleware>();
+}
+
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors();

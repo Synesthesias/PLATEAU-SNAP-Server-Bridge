@@ -59,6 +59,7 @@ RUN dotnet publish "./PLATEAU.Snap.Server.csproj" -c $BUILD_CONFIGURATION -o /ap
 # このステージは、運用環境または VS から通常モードで実行している場合に使用されます (デバッグ構成を使用しない場合の既定)
 FROM base AS final
 WORKDIR /app
+RUN mkdir -p /app/logs
 
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="$JAVA_HOME/bin:$PATH"
