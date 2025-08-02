@@ -107,18 +107,15 @@ internal class CityDbService : ICityDbService
         var reader = new NetTopologySuite.IO.WKTReader();
         var textureCoordinates = reader.Read(response.TextureCoordinates) as Polygon ?? throw new InvalidOperationException($"{nameof(response.TextureCoordinates)} is not a valid polygon.");
         var fileBytes = await this.imageRepository.DownloadAsync(response.Path);
-        string? mimeType = null;
+        string? imageType = null;
         switch (Path.GetExtension(response.Path).ToLower())
         {
             case ".png":
-                mimeType = "image/png";
+                imageType = "png";
                 break;
             case ".jpg":
             case ".jpeg":
-                mimeType = "image/jpg";
-                break;
-            case ".webp":
-                mimeType = "image/webp";
+                imageType = "jpg";
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported texture file type: {Path.GetExtension(response.Path)}");
@@ -127,7 +124,7 @@ internal class CityDbService : ICityDbService
         if (textureparam is null)
         {
             // Textureparamが存在しない場合は新規追加
-            await AddTextureparamAsync(payload.FaceId, textureCoordinates, mimeType, fileBytes);
+            await AddTextureparamAsync(payload.FaceId, textureCoordinates, imageType, fileBytes, payload.BuildingId);
         }
         else
         {
@@ -140,12 +137,12 @@ internal class CityDbService : ICityDbService
             if (count == 1)
             {
                 // このTexImageに紐づくSurfaceDataが1つだけの場合は更新
-                await UpdateTexImageAsync(textureparam, textureCoordinates, mimeType, fileBytes);
+                await UpdateTexImageAsync(textureparam, textureCoordinates, imageType, fileBytes, payload.BuildingId);
             }
             else if (count > 1)
             {
                 // このTexImageに紐づくSurfaceDataが複数ある場合は新規追加
-                await AddTexImageAsync(textureparam, textureCoordinates, mimeType, fileBytes);
+                await AddTexImageAsync(textureparam, textureCoordinates, imageType, fileBytes, payload.BuildingId);
             }
             else
             {
@@ -154,12 +151,18 @@ internal class CityDbService : ICityDbService
         }
     }
 
-    private async Task AddTextureparamAsync(int faceId, Polygon textureCoordinates, string mimeType, byte[] fileBytes)
+    private async Task AddTextureparamAsync(int faceId, Polygon textureCoordinates, string imageType, byte[] fileBytes, int buildingId)
     {
         var objectClass = await this.imageRepository.GetObjectClass("ParameterizedTexture");
         if (objectClass is null)
         {
             throw new InvalidOperationException("Object class 'ParameterizedTexture' not found.");
+        }
+
+        var appearance = await this.imageRepository.GetAppearanceAsync(buildingId);
+        if (appearance is null)
+        {
+            throw new InvalidOperationException($"Building with ID {buildingId} does not exist.");
         }
 
         var textureparam = new Textureparam
@@ -174,15 +177,18 @@ internal class CityDbService : ICityDbService
                 ObjectclassId = objectClass.Id,
                 TexImage = new TexImage
                 {
-                    TexMimeType = mimeType,
-                    TexImageData = fileBytes
-                }
+                    TexMimeType = $"image/{imageType}",
+                    TexImageData = fileBytes,
+                    TexImageUri = $"tex_{Guid.NewGuid()}.{imageType}",
+                },
+                Appearances = new List<Appearance> { appearance }
             }
         };
+
         await this.imageRepository.AddTextureparamAsync(textureparam);
     }
 
-    private async Task UpdateTexImageAsync(Textureparam textureparam, Polygon textureCoordinates, string mimeType, byte[] fileBytes)
+    private async Task UpdateTexImageAsync(Textureparam textureparam, Polygon textureCoordinates, string imageType, byte[] fileBytes, int buildingId)
     {
         if (textureparam.SurfaceData.TexImage is null)
         {
@@ -190,21 +196,48 @@ internal class CityDbService : ICityDbService
         }
 
         textureparam.TextureCoordinates = textureCoordinates;
-        textureparam.SurfaceData.TexImage.TexMimeType = mimeType;
+        textureparam.SurfaceData.TexImage.TexMimeType = $"image/{imageType}";
         textureparam.SurfaceData.TexImage.TexImageData = fileBytes;
+        textureparam.SurfaceData.TexImage.TexImageUri = !string.IsNullOrEmpty(textureparam.SurfaceData.TexImage.TexImageUri)
+            ? Path.ChangeExtension(textureparam.SurfaceData.TexImage.TexImageUri, $".{imageType}")
+            : $"tex_{textureparam.SurfaceData.TexImage.Id}.{imageType}";
+
+        if (textureparam.SurfaceData.Appearances is null || !textureparam.SurfaceData.Appearances.Any())
+        {
+            var appearance = await this.imageRepository.GetAppearanceAsync(buildingId);
+            if (appearance is null)
+            {
+                throw new InvalidOperationException($"Building with ID {buildingId} does not exist.");
+            }
+
+            textureparam.SurfaceData.Appearances = new List<Appearance> { appearance };
+        }
 
         await this.imageRepository.UpdateTextureparamAsync(textureparam);
     }
 
-    private async Task AddTexImageAsync(Textureparam textureparam, Polygon textureCoordinates, string mimeType, byte[] fileBytes)
+    private async Task AddTexImageAsync(Textureparam textureparam, Polygon textureCoordinates, string imageType, byte[] fileBytes, int buildingId)
     {
-        var newTexImage = new TexImage
+        var appearance = await this.imageRepository.GetAppearanceAsync(buildingId);
+        if (appearance is null)
         {
-            TexMimeType = mimeType,
-            TexImageData = fileBytes
+            throw new InvalidOperationException($"Building with ID {buildingId} does not exist.");
+        }
+
+        var surfaceData = new SurfaceDatum
+        {
+            Gmlid = $"ID_{Guid.NewGuid()}",
+            IsFront = 1,
+            ObjectclassId = textureparam.SurfaceData.ObjectclassId,
+            TexImage = new TexImage
+            {
+                TexMimeType = $"image/{imageType}",
+                TexImageData = fileBytes,
+                TexImageUri = $"tex_{Guid.NewGuid()}.{imageType}",
+            },
+            Appearances = new List<Appearance> { appearance }
         };
-        textureparam.SurfaceData.TexImage = newTexImage;
-        textureparam.TextureCoordinates = textureCoordinates;
+        textureparam.SurfaceData = surfaceData;
         await this.imageRepository.UpdateTextureparamAsync(textureparam);
     }
 }

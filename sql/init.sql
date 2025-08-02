@@ -102,6 +102,7 @@ SELECT id, gmlid, ST_Centroid(ST_Transform(ST_FlipCoordinates(ST_Force2D(geometr
 CREATE INDEX IF NOT EXISTS surface_centroid_center_geom_idx ON citydb.surface_centroid USING gist (center);
 CREATE INDEX IF NOT EXISTS surface_centroid_building_id_idx ON citydb.surface_centroid (building_id);
 
+DROP view IF EXISTS building_appearance;
 DROP view IF EXISTS building_faces;
 DROP view IF EXISTS roof_surfaces;
 DROP view IF EXISTS surface_images;
@@ -140,3 +141,12 @@ CREATE VIEW building_faces AS
 SELECT building_id, face_id, image_id, gmlid, false AS is_ortho, thumbnail, coordinates, timestamp FROM surface_images
 UNION ALL
 SELECT building_id, face_id, NULL, gmlid, true AS is_ortho, NULL, NULL, NULL FROM roof_surfaces;
+
+CREATE VIEW building_appearance AS
+SELECT DISTINCT b.id AS building_id, a.id AS appearance_id FROM surface_geometry AS sg
+JOIN textureparam AS tp ON sg.id=tp.surface_geometry_id
+JOIN surface_data AS sd ON sd.id=tp.surface_data_id
+JOIN appear_to_surface_data AS ats ON sd.id=ats.surface_data_id
+JOIN appearance AS a ON ats.appearance_id=a.id
+JOIN thematic_surface ts ON sg.root_id = ts.lod2_multi_surface_id
+JOIN building b ON ts.building_id = b.id;

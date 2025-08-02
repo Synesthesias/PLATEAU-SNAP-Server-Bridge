@@ -16,7 +16,11 @@ public partial class CitydbV4DbContext : DbContext
     {
     }
 
+    public virtual DbSet<Appearance> Appearances { get; set; }
+
     public virtual DbSet<Building> Buildings { get; set; }
+
+    public virtual DbSet<BuildingAppearance> BuildingAppearances { get; set; }
 
     public virtual DbSet<BuildingFace> BuildingFaces { get; set; }
 
@@ -47,6 +51,49 @@ public partial class CitydbV4DbContext : DbContext
         modelBuilder
             .HasPostgresExtension("postgis")
             .HasPostgresExtension("postgis_raster");
+
+        modelBuilder.Entity<Appearance>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("appearance_pk");
+
+            entity.ToTable("appearance", "citydb");
+
+            entity.HasIndex(e => e.CitymodelId, "appearance_citymodel_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.CityobjectId, "appearance_cityobject_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => new { e.Gmlid, e.GmlidCodespace }, "appearance_inx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.HasIndex(e => e.Theme, "appearance_theme_inx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('appearance_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.CitymodelId).HasColumnName("citymodel_id");
+            entity.Property(e => e.CityobjectId).HasColumnName("cityobject_id");
+            entity.Property(e => e.Description)
+                .HasMaxLength(4000)
+                .HasColumnName("description");
+            entity.Property(e => e.Gmlid)
+                .HasMaxLength(256)
+                .HasColumnName("gmlid");
+            entity.Property(e => e.GmlidCodespace)
+                .HasMaxLength(1000)
+                .HasColumnName("gmlid_codespace");
+            entity.Property(e => e.Name)
+                .HasMaxLength(1000)
+                .HasColumnName("name");
+            entity.Property(e => e.NameCodespace)
+                .HasMaxLength(4000)
+                .HasColumnName("name_codespace");
+            entity.Property(e => e.Theme)
+                .HasMaxLength(256)
+                .HasColumnName("theme");
+
+            entity.HasOne(d => d.Cityobject).WithMany(p => p.Appearances)
+                .HasForeignKey(d => d.CityobjectId)
+                .HasConstraintName("appearance_cityobject_fk");
+        });
 
         modelBuilder.Entity<Building>(entity =>
         {
@@ -237,6 +284,16 @@ public partial class CitydbV4DbContext : DbContext
                 .HasForeignKey(d => d.ObjectclassId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("building_objectclass_fk");
+        });
+
+        modelBuilder.Entity<BuildingAppearance>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("building_appearance", "citydb");
+
+            entity.Property(e => e.AppearanceId).HasColumnName("appearance_id");
+            entity.Property(e => e.BuildingId).HasColumnName("building_id");
         });
 
         modelBuilder.Entity<BuildingFace>(entity =>
@@ -538,6 +595,26 @@ public partial class CitydbV4DbContext : DbContext
             entity.HasOne(d => d.TexImage).WithMany(p => p.SurfaceData)
                 .HasForeignKey(d => d.TexImageId)
                 .HasConstraintName("surface_data_tex_image_fk");
+
+            entity.HasMany(d => d.Appearances).WithMany(p => p.SurfaceData)
+                .UsingEntity<Dictionary<string, object>>(
+                    "AppearToSurfaceDatum",
+                    r => r.HasOne<Appearance>().WithMany()
+                        .HasForeignKey("AppearanceId")
+                        .OnDelete(DeleteBehavior.ClientSetNull)
+                        .HasConstraintName("app_to_surf_data_fk1"),
+                    l => l.HasOne<SurfaceDatum>().WithMany()
+                        .HasForeignKey("SurfaceDataId")
+                        .HasConstraintName("app_to_surf_data_fk"),
+                    j =>
+                    {
+                        j.HasKey("SurfaceDataId", "AppearanceId").HasName("appear_to_surface_data_pk");
+                        j.ToTable("appear_to_surface_data", "citydb");
+                        j.HasIndex(new[] { "SurfaceDataId" }, "app_to_surf_data_fkx").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+                        j.HasIndex(new[] { "AppearanceId" }, "app_to_surf_data_fkx1").HasAnnotation("Npgsql:StorageParameter:fillfactor", "90");
+                        j.IndexerProperty<int>("SurfaceDataId").HasColumnName("surface_data_id");
+                        j.IndexerProperty<int>("AppearanceId").HasColumnName("appearance_id");
+                    });
         });
 
         modelBuilder.Entity<SurfaceGeometry>(entity =>

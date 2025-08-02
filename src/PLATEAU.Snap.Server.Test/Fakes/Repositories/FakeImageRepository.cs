@@ -69,4 +69,14 @@ internal class FakeImageRepository : IImageRepository
     {
         return await Task.FromResult(new Objectclass() { Id = 54 });
     }
+
+    public Task<Appearance?> GetAppearanceAsync(int buildingId)
+    {
+        return Task.FromResult<Appearance?>(new Appearance()
+        {
+            Id = 1,
+            Gmlid = "appearance-1",
+            Name = "Test Appearance",
+        });
+    }
 }

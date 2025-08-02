@@ -21,4 +21,6 @@ public interface IImageRepository
     Task AddTextureparamAsync(Textureparam textureparam);
 
     Task<Objectclass?> GetObjectClass(string classname);
+
+    Task<Appearance?> GetAppearanceAsync(int buildingId);
 }

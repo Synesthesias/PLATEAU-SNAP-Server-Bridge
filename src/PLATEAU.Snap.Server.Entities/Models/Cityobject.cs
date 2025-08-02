@@ -40,6 +40,8 @@ public partial class Cityobject
 
     public string? XmlSource { get; set; }
 
+    public virtual ICollection<Appearance> Appearances { get; set; } = new List<Appearance>();
+
     public virtual Building? Building { get; set; }
 
     public virtual Objectclass Objectclass { get; set; } = null!;

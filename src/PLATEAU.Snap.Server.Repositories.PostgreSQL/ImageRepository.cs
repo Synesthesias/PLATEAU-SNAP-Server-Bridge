@@ -69,6 +69,8 @@ internal class ImageRepository : BaseRepository, IImageRepository
             .Where(x => x.SurfaceGeometryId == surfaceGeometryId && x.IsTextureParametrization == 1)
             .Include(x => x.SurfaceData)
                 .ThenInclude(x => x.TexImage)
+            .Include(x => x.SurfaceData)
+                .ThenInclude(x => x.Appearances)
             .FirstOrDefaultAsync(x => x.SurfaceGeometryId == surfaceGeometryId);
 
         return textureparam;
@@ -103,6 +105,14 @@ internal class ImageRepository : BaseRepository, IImageRepository
     {
         return await Context.Objectclasses
             .Where(x => x.Classname == classname)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<Appearance?> GetAppearanceAsync(int buildingId)
+    {
+        return await Context.BuildingAppearances
+            .Where(x => x.BuildingId == buildingId)
+            .Join(Context.Appearances, ba => ba.AppearanceId, a => a.Id, (ba, a) => a)
             .FirstOrDefaultAsync();
     }
 }

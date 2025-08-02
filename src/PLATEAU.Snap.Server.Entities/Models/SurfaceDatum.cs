@@ -55,4 +55,6 @@ public partial class SurfaceDatum
     public virtual TexImage? TexImage { get; set; }
 
     public virtual ICollection<Textureparam> Textureparams { get; set; } = new List<Textureparam>();
+
+    public virtual ICollection<Appearance> Appearances { get; set; } = new List<Appearance>();
 }
