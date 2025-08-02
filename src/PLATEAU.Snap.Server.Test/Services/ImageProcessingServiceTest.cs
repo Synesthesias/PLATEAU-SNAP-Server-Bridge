@@ -198,6 +198,32 @@ public class ImageProcessingServiceTest
         Assert.Equal(typeof(LambdaOperationException), exception.GetType());
     }
 
+    [Fact(DisplayName = "Lambda ResponseのPOLYGONのパースに失敗")]
+    [Trait("Category", "Unit")]
+    public async Task LambdaWktParseFail()
+    {
+        var amazonLambda = new FakeAmazonLambda();
+        amazonLambda.IsWktParseFailed = true;
+        var service = CreateService(amazonLambda);
+
+        const string path = "s3://1/2/3.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+        const string geometry = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+
+        var request = new LambdaTransformRequest
+        {
+            Path = path,
+            Coordinates = coordinates,
+            Geometry = geometry,
+        };
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            await service.TransformAsync(request);
+        });
+        Assert.Equal(typeof(LambdaOperationException), exception.GetType());
+    }
+
     [Fact(DisplayName = "Lambda ResponseのCoordinatesが不正")]
     [Trait("Category", "Unit")]
     public async Task LambdaNotValidCoordinates()

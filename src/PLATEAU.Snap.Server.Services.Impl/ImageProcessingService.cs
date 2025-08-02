@@ -72,13 +72,13 @@ internal class ImageProcessingService : IImageProcessingService
             var response = Util.Deserialize<LambdaResponse>(json);
             if (response is null || response.Body is null)
             {
-                throw new LambdaOperationException("Failed to deserialize Lambda response.");
+                throw new LambdaOperationException($"Failed to deserialize Lambda response: {json}");
             }
 
             var responseBody = Util.Deserialize<TResponse>(response.Body);
             if (responseBody is null)
             {
-                throw new LambdaOperationException("Failed to deserialize Lambda response body.");
+                throw new LambdaOperationException($"Failed to deserialize Lambda response body: {response.Body}");
             }
             if (response.StatusCode != 200)
             {
@@ -106,7 +106,7 @@ internal class ImageProcessingService : IImageProcessingService
             var geometry = reader.Read(coordinates);
             if (geometry is null || !geometry.IsValid)
             {
-                throw new LambdaOperationException($"{nameof(coordinates)} is not a valid geometry.");
+                throw new LambdaOperationException($"{nameof(coordinates)} is not a valid geometry: {coordinates}");
             }
         }
         catch (Exception ex)

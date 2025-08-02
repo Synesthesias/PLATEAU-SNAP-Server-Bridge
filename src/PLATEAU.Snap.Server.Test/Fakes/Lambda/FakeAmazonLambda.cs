@@ -20,6 +20,8 @@ internal class FakeAmazonLambda : IAmazonLambda
 
     public bool IsEmptyCoordinates { get; set; }
 
+    public bool IsWktParseFailed { get; set; }
+
     public bool IsNotValidCoordinates { get; set; }
 
     public ILambdaPaginatorFactory Paginators => throw new NotImplementedException();
@@ -43,9 +45,13 @@ internal class FakeAmazonLambda : IAmazonLambda
         {
             coordinates = string.Empty;
         }
-        else if (IsNotValidCoordinates)
+        else if (IsWktParseFailed)
         {
             coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10))";
+        }
+        else if (IsNotValidCoordinates)
+        {
+            coordinates = "POLYGON((10 10, 10 20, 20 10, 20 20, 10 10))";
         }
         else
         {
