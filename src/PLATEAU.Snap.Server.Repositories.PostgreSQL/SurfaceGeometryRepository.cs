@@ -220,4 +220,60 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
     {
         return await Context.SurfaceImages.Where(x => x.BuildingId == buildingId && x.FaceId == faceId).AnyAsync();
     }
+
+    public async Task<Geometry?> GetEnvelopeGeometryAsync(int buildingId)
+    {
+        var connection = Context.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"
+            WITH extent AS(
+              SELECT ST_3DExtent(ST_Transform(ST_FlipCoordinates(geometry), 4326)) AS box FROM surface_geometry
+              WHERE id IN (
+                SELECT id FROM surface_centroid WHERE building_id = @buildingId
+              )
+            )
+            SELECT ST_MakeLine(ARRAY[
+              ST_MakePoint(xmin, ymin, zmin),
+              ST_MakePoint(xmax, ymax, zmax)
+            ]) AS geom
+            FROM (
+              SELECT
+                ST_XMin(box) AS xmin, ST_YMin(box) AS ymin, ST_ZMin(box) AS zmin,
+                ST_XMax(box) AS xmax, ST_YMax(box) AS ymax, ST_ZMax(box) AS zmax
+              FROM extent
+            )";
+        command.Parameters.Add(command.CreateParameter("buildingId", buildingId));
+
+        using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? await reader.GetFieldValueAsync<Geometry>(0) : null;
+    }
+
+    public async Task<Geometry?> GetFootprintAsync(int buildingId)
+    {
+        var connection = Context.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"
+            WITH t AS (
+              SELECT sg.*,b.id AS building_id FROM building AS b
+              JOIN surface_geometry AS sg ON b.lod1_solid_id=sg.root_id
+              WHERE parent_id IS NOT NULL AND is_composite = 0
+            )
+            SELECT ST_Transform(ST_Union(ST_FlipCoordinates(ST_Force2D(geometry))), 4326) as footprint FROM t
+            WHERE building_id=@buildingId
+            GROUP BY building_id";
+        command.Parameters.Add(command.CreateParameter("buildingId", buildingId));
+
+        using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? await reader.GetFieldValueAsync<Geometry>(0) : null;
+    }
 }

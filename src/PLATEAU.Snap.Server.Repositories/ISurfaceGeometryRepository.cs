@@ -1,4 +1,5 @@
-﻿using PLATEAU.Snap.Models.Common;
+﻿using NetTopologySuite.Geometries;
+using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Entities.Models;
 
@@ -25,4 +26,8 @@ public interface ISurfaceGeometryRepository
     Task<bool> ExistsAsync(int buildingId);
 
     Task<bool> ExistsAsync(int buildingId, int faceId);
+
+    Task<Geometry?> GetEnvelopeGeometryAsync(int buildingId);
+
+    Task<Geometry?> GetFootprintAsync(int buildingId);
 }

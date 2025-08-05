@@ -16,7 +16,7 @@ public interface IImageRepository
 
     Task<int> CountSurfaceData(int texImageId);
 
-    Task UpdateTextureparamAsync(Textureparam textureparam);
+    Task UpdateTextureparamAsync(Textureparam textureparam, bool isAppearancesModified);
 
     Task AddTextureparamAsync(Textureparam textureparam);
 

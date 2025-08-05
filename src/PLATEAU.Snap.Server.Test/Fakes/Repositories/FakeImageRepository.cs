@@ -55,7 +55,7 @@ internal class FakeImageRepository : IImageRepository
         return await Task.FromResult(RelationSurfaceDataCount);
     }
 
-    public async Task UpdateTextureparamAsync(Textureparam textureparam)
+    public async Task UpdateTextureparamAsync(Textureparam textureparam, bool isAppearancesModified)
     {
         await Task.CompletedTask;
     }

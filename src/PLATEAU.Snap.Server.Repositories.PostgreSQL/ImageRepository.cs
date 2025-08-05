@@ -89,9 +89,13 @@ internal class ImageRepository : BaseRepository, IImageRepository
             .CountAsync();
     }
 
-    public async Task UpdateTextureparamAsync(Textureparam textureparam)
+    public async Task UpdateTextureparamAsync(Textureparam textureparam, bool isAppearancesModified)
     {
         Context.Textureparams.Update(textureparam);
+        if (!isAppearancesModified)
+        {
+            Context.Entry(textureparam.SurfaceData).Collection(x => x.Appearances).IsModified = false;
+        }
         await Context.SaveChangesAsync();
     }
 

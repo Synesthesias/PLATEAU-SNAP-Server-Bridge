@@ -9,6 +9,8 @@ namespace PLATEAU.Snap.Server.Test.Fakes.Repositories;
 
 internal class FakeSurfaceGeometryRepository : ISurfaceGeometryRepository
 {
+    private GeometryFactory geometryFactory = new();
+
     public List<BuildingFace> BuildingFaces { get; } = new();
 
     public bool IsFaceWktNull { get; set; }
@@ -110,13 +112,34 @@ internal class FakeSurfaceGeometryRepository : ISurfaceGeometryRepository
         }).FirstOrDefault());
     }
 
-    public Task<bool> ExistsAsync(int buildingId)
+    public async Task<bool> ExistsAsync(int buildingId)
     {
-        return Task.FromResult(BuildingFaces.Any(x => x.BuildingId == buildingId));
+        return await Task.FromResult(BuildingFaces.Any(x => x.BuildingId == buildingId));
     }
 
-    public Task<bool> ExistsAsync(int buildingId, int faceId)
+    public async Task<bool> ExistsAsync(int buildingId, int faceId)
     {
-        return Task.FromResult(BuildingFaces.Any(x => x.BuildingId == buildingId && x.FaceId == faceId));
+        return await Task.FromResult(BuildingFaces.Any(x => x.BuildingId == buildingId && x.FaceId == faceId));
+    }
+
+    public async Task<Geometry?> GetEnvelopeGeometryAsync(int buildingId)
+    {
+        var geometry = geometryFactory.CreateLineString(
+        [
+            new CoordinateZ(139.77269201771884, 35.64980103144675, 0),
+            new CoordinateZ(139.77342995177577, 35.650073717982856, 5.14),
+        ]);
+        return await Task.FromResult(geometry);
+    }
+
+    public Task<Geometry?> GetFootprintAsync(int buildingId)
+    {
+        var geometry = geometryFactory.CreatePolygon(
+        [
+            new Coordinate(139.77269201771884, 35.64980103144675),
+            new Coordinate(139.77342995177577, 35.650073717982856),
+            new Coordinate(139.77269201771884, 35.64980103144675),
+        ]);
+        return Task.FromResult<Geometry?>(geometry);
     }
 }

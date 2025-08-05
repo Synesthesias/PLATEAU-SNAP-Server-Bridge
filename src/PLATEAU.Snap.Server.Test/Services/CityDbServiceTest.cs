@@ -144,6 +144,7 @@ public class CityDbServiceTest
     private static CityDbService CreateService()
     {
         var imageRepository = new FakeImageRepository();
+        var surfaceGeometryRepository = new FakeSurfaceGeometryRepository();
         var imageProcessingService = new FakeImageProcessingService();
         var grid = new Grid(null!);
         var appSettings = new AppSettings();
@@ -151,19 +152,20 @@ public class CityDbServiceTest
 
         SeedFakeData(imageRepository);
 
-        return new CityDbService(imageRepository, imageProcessingService, appSettings, databaseSettings);
+        return new CityDbService(imageRepository, imageProcessingService, surfaceGeometryRepository, appSettings, databaseSettings);
     }
 
     private static CityDbService CreateService(FakeImageRepository imageRepository)
     {
         var imageProcessingService = new FakeImageProcessingService();
+        var surfaceGeometryRepository = new FakeSurfaceGeometryRepository();
         var grid = new Grid(null!);
         var appSettings = new AppSettings();
         var databaseSettings = new DatabaseSettings();
 
         SeedFakeData(imageRepository);
 
-        return new CityDbService(imageRepository, imageProcessingService, appSettings, databaseSettings);
+        return new CityDbService(imageRepository, imageProcessingService, surfaceGeometryRepository, appSettings, databaseSettings);
     }
 
     private static void SeedFakeData(FakeImageRepository repository)
