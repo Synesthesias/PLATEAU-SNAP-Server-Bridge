@@ -29,5 +29,5 @@ public interface ISurfaceGeometryRepository
 
     Task<Geometry?> GetEnvelopeGeometryAsync(int buildingId);
 
-    Task<Geometry?> GetFootprintAsync(int buildingId);
+    Task<Geometry?> GetRoofprintAsync(int buildingId);
 }

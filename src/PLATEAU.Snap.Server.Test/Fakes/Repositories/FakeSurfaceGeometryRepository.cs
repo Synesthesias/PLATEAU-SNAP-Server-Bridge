@@ -132,7 +132,7 @@ internal class FakeSurfaceGeometryRepository : ISurfaceGeometryRepository
         return await Task.FromResult(geometry);
     }
 
-    public Task<Geometry?> GetFootprintAsync(int buildingId)
+    public Task<Geometry?> GetRoofprintAsync(int buildingId)
     {
         var geometry = geometryFactory.CreatePolygon(
         [

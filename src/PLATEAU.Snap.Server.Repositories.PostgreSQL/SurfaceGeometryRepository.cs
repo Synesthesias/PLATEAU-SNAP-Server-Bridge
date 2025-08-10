@@ -253,7 +253,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
         return await reader.ReadAsync() ? await reader.GetFieldValueAsync<Geometry>(0) : null;
     }
 
-    public async Task<Geometry?> GetFootprintAsync(int buildingId)
+    public async Task<Geometry?> GetRoofprintAsync(int buildingId)
     {
         var connection = Context.Database.GetDbConnection();
         if (connection.State != ConnectionState.Open)
@@ -263,14 +263,9 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
         using var command = connection.CreateCommand();
         command.CommandText = @"
-            WITH t AS (
-              SELECT sg.*,b.id AS building_id FROM building AS b
-              JOIN surface_geometry AS sg ON b.lod1_solid_id=sg.root_id
-              WHERE parent_id IS NOT NULL AND is_composite = 0
-            )
-            SELECT ST_Transform(ST_Union(ST_FlipCoordinates(ST_Force2D(geometry))), 4326) as footprint FROM t
-            WHERE building_id=@buildingId
-            GROUP BY building_id";
+            SELECT ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326) AS roofprint FROM building AS b
+            JOIN surface_geometry AS sg ON b.lod0_roofprint_id=sg.root_id
+            WHERE b.id=@buildingId AND parent_id IS NOT NULL;";
         command.Parameters.Add(command.CreateParameter("buildingId", buildingId));
 
         using var reader = await command.ExecuteReaderAsync();

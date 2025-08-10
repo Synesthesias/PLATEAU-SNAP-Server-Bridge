@@ -41,12 +41,12 @@ internal class CityDbService : ICityDbService
         try
         {
             // メッシュコードの取得
-            var footprint = await this.surfaceGeometryRepository.GetFootprintAsync(id);
-            if (footprint is null)
+            var roofprint = await this.surfaceGeometryRepository.GetRoofprintAsync(id);
+            if (roofprint is null)
             {
                 throw new NotFoundException($"Building with ID {id} does not exist.");
             }
-            var meshCode = MeshUtil.GetThirdMeshCode(footprint);
+            var meshCode = MeshUtil.GetThirdMeshCode(roofprint);
 
             // 3D City Database Importer/Exporter に不具合があり、zip出力するとzipを閉じる際に例外がスローされることがある
             // これを回避するために、ツールではファイルとして出力し、自前でzip化している
