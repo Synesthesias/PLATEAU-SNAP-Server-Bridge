@@ -12,6 +12,10 @@ namespace PLATEAU.Snap.Server.Services;
 
 internal class CityDbService : ICityDbService
 {
+    private const string CityGmlSchemaLocation = "https://www.geospatial.jp/iur/uro/3.0 ../../schemas/iur/uro/3.0/urbanObject.xsd http://www.opengis.net/citygml/2.0 http://schemas.opengis.net/citygml/2.0/cityGMLBase.xsd http://www.opengis.net/citygml/landuse/2.0 http://schemas.opengis.net/citygml/landuse/2.0/landUse.xsd http://www.opengis.net/citygml/building/2.0 http://schemas.opengis.net/citygml/building/2.0/building.xsd http://www.opengis.net/citygml/transportation/2.0 http://schemas.opengis.net/citygml/transportation/2.0/transportation.xsd http://www.opengis.net/citygml/generics/2.0 http://schemas.opengis.net/citygml/generics/2.0/generics.xsd http://www.opengis.net/citygml/relief/2.0 http://schemas.opengis.net/citygml/relief/2.0/relief.xsd http://www.opengis.net/citygml/cityobjectgroup/2.0 http://schemas.opengis.net/citygml/cityobjectgroup/2.0/cityObjectGroup.xsd http://www.opengis.net/gml http://schemas.opengis.net/gml/3.1.1/base/gml.xsd http://www.opengis.net/citygml/appearance/2.0 http://schemas.opengis.net/citygml/appearance/2.0/appearance.xsd";
+
+    private const string NamespaceCityGml2_0 = "http://www.opengis.net/citygml/2.0";
+
     private readonly IImageRepository imageRepository;
 
     private readonly IImageProcessingService imageProcessingService;
@@ -284,8 +288,14 @@ internal class CityDbService : ICityDbService
 
     private static void ApplyPlateauCityGml(string inputPath, string outputPath, Geometry envelope, string plateauAppearancePath)
     {
+        var xmlWriterSettings = new XmlWriterSettings() 
+        {
+            Indent = true,
+            NewLineChars = "\n",
+            Encoding = new System.Text.UTF8Encoding(false),
+        };
         using (XmlReader reader = XmlReader.Create(inputPath))
-        using (XmlWriter writer = XmlWriter.Create(outputPath, new XmlWriterSettings { Indent = true }))
+        using (XmlWriter writer = XmlWriter.Create(outputPath, xmlWriterSettings))
         {
             bool insideCityModel = false;
             bool boundedByWritten = false;
@@ -293,18 +303,40 @@ internal class CityDbService : ICityDbService
 
             while (reader.Read())
             {
-                if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "CityModel")
+                if (reader.NodeType == XmlNodeType.XmlDeclaration)
                 {
-                    // Write CityModel start tag with attributes
-                    writer.WriteStartElement(reader.Prefix, reader.LocalName, reader.NamespaceURI);
-                    if (reader.HasAttributes)
-                    {
-                        while (reader.MoveToNextAttribute())
-                        {
-                            writer.WriteAttributeString(reader.Prefix, reader.LocalName, reader.NamespaceURI, reader.Value);
-                        }
-                        reader.MoveToElement(); // Move back to the element node
-                    }
+                    writer.WriteStartDocument();
+                }
+                else if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "CityModel")
+                {
+                    // PLATEAU CityGMLの名前空間と属性を設定
+                    writer.WriteStartElement("core", reader.LocalName, NamespaceCityGml2_0);
+                    writer.WriteAttributeString("xmlns", "brid", null, "http://www.opengis.net/citygml/bridge/2.0");
+                    writer.WriteAttributeString("xmlns", "tran", null, "http://www.opengis.net/citygml/transportation/2.0");
+                    writer.WriteAttributeString("xmlns", "frn", null, "http://www.opengis.net/citygml/cityfurniture/2.0");
+                    writer.WriteAttributeString("xmlns", "wtr", null, "http://www.opengis.net/citygml/waterbody/2.0");
+                    writer.WriteAttributeString("xmlns", "sch", null, "http://www.ascc.net/xml/schematron");
+                    writer.WriteAttributeString("xmlns", "veg", null, "http://www.opengis.net/citygml/vegetation/2.0");
+                    writer.WriteAttributeString("xmlns", "xlink", null, "http://www.w3.org/1999/xlink");
+                    writer.WriteAttributeString("xmlns", "tun", null, "http://www.opengis.net/citygml/tunnel/2.0");
+                    writer.WriteAttributeString("xmlns", "tex", null, "http://www.opengis.net/citygml/texturedsurface/2.0");
+                    writer.WriteAttributeString("xmlns", "gml", null, "http://www.opengis.net/gml");
+                    writer.WriteAttributeString("xmlns", "app", null, "http://www.opengis.net/citygml/appearance/2.0");
+                    writer.WriteAttributeString("xmlns", "gen", null, "http://www.opengis.net/citygml/generics/2.0");
+                    writer.WriteAttributeString("xmlns", "dem", null, "http://www.opengis.net/citygml/relief/2.0");
+                    writer.WriteAttributeString("xmlns", "luse", null, "http://www.opengis.net/citygml/landuse/2.0");
+                    writer.WriteAttributeString("xmlns", "uro", null, "https://www.geospatial.jp/iur/uro/3.0");
+                    writer.WriteAttributeString("xmlns", "xAL", null, "urn:oasis:names:tc:ciq:xsdschema:xAL:2.0");
+                    writer.WriteAttributeString("xmlns", "bldg", null, "http://www.opengis.net/citygml/building/2.0");
+                    writer.WriteAttributeString("xmlns", "smil20", null, "http://www.w3.org/2001/SMIL20/");
+                    writer.WriteAttributeString("xmlns", "xsi", null, "http://www.w3.org/2001/XMLSchema-instance");
+                    writer.WriteAttributeString("xmlns", "smil20lang", null, "http://www.w3.org/2001/SMIL20/Language");
+                    writer.WriteAttributeString("xmlns", "pbase", null, "http://www.opengis.net/citygml/profiles/base/2.0");
+                    writer.WriteAttributeString("xmlns", "core", null, NamespaceCityGml2_0);
+                    writer.WriteAttributeString("xmlns", "grp", null, "http://www.opengis.net/citygml/cityobjectgroup/2.0");
+                    writer.WriteAttributeString("xsi", "schemaLocation", "http://www.w3.org/2001/XMLSchema-instance", CityGmlSchemaLocation);
+
+                    reader.MoveToElement();
 
                     // フラグ立ててboundedBy挿入タイミングとする
                     insideCityModel = true;
@@ -369,7 +401,7 @@ internal class CityDbService : ICityDbService
         switch (reader.NodeType)
         {
             case XmlNodeType.Element:
-                writer.WriteStartElement(reader.Prefix, reader.LocalName, reader.NamespaceURI);
+                writer.WriteStartElement(reader.NamespaceURI == NamespaceCityGml2_0 ? "core" : reader.Prefix, reader.LocalName, reader.NamespaceURI);
                 if (reader.HasAttributes)
                 {
                     while (reader.MoveToNextAttribute())
@@ -388,23 +420,14 @@ internal class CityDbService : ICityDbService
             case XmlNodeType.CDATA:
                 writer.WriteCData(reader.Value);
                 break;
-
-            case XmlNodeType.ProcessingInstruction:
-            case XmlNodeType.XmlDeclaration:
-                writer.WriteProcessingInstruction(reader.Name, reader.Value);
-                break;
-
-            case XmlNodeType.Comment:
-                writer.WriteComment(reader.Value);
-                break;
-
             case XmlNodeType.EndElement:
                 writer.WriteEndElement();
                 break;
 
+            case XmlNodeType.ProcessingInstruction:
+            case XmlNodeType.Comment:
             case XmlNodeType.Whitespace:
             case XmlNodeType.SignificantWhitespace:
-                writer.WriteWhitespace(reader.Value);
                 break;
         }
     }
