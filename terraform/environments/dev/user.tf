@@ -128,3 +128,16 @@ resource "aws_iam_group_policy_attachment" "allow_ecr_push" {
   policy_arn = aws_iam_policy.allow_ecr_push.arn
   group      = data.aws_iam_group.default.group_name
 }
+resource "aws_iam_group_policy" "lambda_invoke" {
+  name  = "${local.app_name}-lambda-invoke"
+  group = local.iam.group_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action   = "lambda:InvokeFunction"
+      Effect   = "Allow"
+      Resource = "arn:aws:lambda:${local.aws.region}:${data.aws_caller_identity.current.account_id}:function:${local.app_name_prefix}-${local.stage}-*"
+    }]
+  })
+}

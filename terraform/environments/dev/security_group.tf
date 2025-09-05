@@ -33,6 +33,46 @@ resource "aws_security_group" "rds" {
   }
 }
 
+resource "aws_security_group" "lambda_sg_s3_only" {
+  name = "${local.app_name}-lambda-sg-s3-only"
+  description = "Allow outbound traffic to S3 Gateway Endpoint"
+  vpc_id      = aws_vpc.default.id 
+
+  tags = {
+    Name = "${local.app_name}-lambda-sg-s3-only"
+  }
+
+  egress {
+    description = "HTTPS to S3 Gateway Endpoint for bucket operations"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    prefix_list_ids = [data.aws_prefix_list.s3.id]
+    }
+}
+
+resource "aws_security_group" "lambda_sg_internet_access" {
+  name = "${local.app_name}-lambda-sg-internet-access"
+  description = "Allow all outbound traffic"
+  vpc_id      = aws_vpc.default.id
+
+  tags = {
+    Name = "${local.app_name}-lambda-sg-internet-access"
+  }
+
+  egress {
+    description = "HTTPS for external API calls"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+data "aws_prefix_list" "s3" {
+  name = "com.amazonaws.${local.aws.region}.s3"
+}
+
 resource "aws_security_group_rule" "ec2_in_ssh" {
   security_group_id = aws_security_group.ec2.id
   type              = "ingress"
