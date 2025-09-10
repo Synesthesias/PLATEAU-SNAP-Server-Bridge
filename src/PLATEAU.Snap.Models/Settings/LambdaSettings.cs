@@ -7,4 +7,8 @@ public class LambdaSettings
     public string RoofExtractionFunctionName { get; set; } = null!;
 
     public string ApplyTextureFunctionName { get; set; } = null!;
+
+    public string ExportBuildingFunctionName { get; set; } = null!;
+
+    public string ExportMeshFunctionName { get; set; } = null!;
 }

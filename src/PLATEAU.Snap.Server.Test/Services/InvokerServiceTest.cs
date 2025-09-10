@@ -6,7 +6,7 @@ using PLATEAU.Snap.Server.Test.Fakes.Lambda;
 
 namespace PLATEAU.Snap.Server.Test.Services;
 
-public class ImageProcessingServiceTest
+public class InvokerServiceTest
 {
     [Fact(DisplayName = "正射変換")]
     [Trait("Category", "Unit")]
@@ -250,7 +250,7 @@ public class ImageProcessingServiceTest
         Assert.Equal(typeof(LambdaOperationException), exception.GetType());
     }
 
-    private static ImageProcessingService CreateService()
+    private static InvokerService CreateService()
     {
         var amazonLambda = new FakeAmazonLambda();
         var lambdaSettings = new LambdaSettings();
@@ -258,16 +258,16 @@ public class ImageProcessingServiceTest
         lambdaSettings.RoofExtractionFunctionName = "roof_extraction";
         lambdaSettings.ApplyTextureFunctionName = "apply_texture";
 
-        return new ImageProcessingService(amazonLambda, lambdaSettings);
+        return new InvokerService(amazonLambda, lambdaSettings);
     }
 
-    private static ImageProcessingService CreateService(FakeAmazonLambda amazonLambda)
+    private static InvokerService CreateService(FakeAmazonLambda amazonLambda)
     {
         var lambdaSettings = new LambdaSettings();
         lambdaSettings.TransformFunctionName = "transform";
         lambdaSettings.RoofExtractionFunctionName = "roof_extraction";
         lambdaSettings.ApplyTextureFunctionName = "apply_texture";
 
-        return new ImageProcessingService(amazonLambda, lambdaSettings);
+        return new InvokerService(amazonLambda, lambdaSettings);
     }
 }

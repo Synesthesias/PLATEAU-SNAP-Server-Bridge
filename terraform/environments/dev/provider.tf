@@ -16,9 +16,10 @@ terraform {
     bucket  = "plateausnap-terraform"
     key     = "dev/terraform.tfstate"
     encrypt = true
+    # profile = "<AWS CLI profile name>"
   }
 }
 
 provider "aws" {
-  region     = local.aws.region
+  region = local.aws.region
 }

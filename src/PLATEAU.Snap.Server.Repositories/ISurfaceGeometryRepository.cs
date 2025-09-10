@@ -30,4 +30,8 @@ public interface ISurfaceGeometryRepository
     Task<Geometry?> GetEnvelopeGeometryAsync(int buildingId);
 
     Task<Geometry?> GetRoofprintAsync(int buildingId);
+
+    Task<List<int>> GetIntersectionsAsync(Polygon envelope);
+
+    Task<List<GeometryInfo>> GetNotContainsAsync(Polygon envelope, int[] includeIds);
 }

@@ -32,6 +32,8 @@ public partial class CitydbV4DbContext : DbContext
 
     public virtual DbSet<ImageSurfaceRelation> ImageSurfaceRelations { get; set; }
 
+    public virtual DbSet<Job> Jobs { get; set; }
+
     public virtual DbSet<Objectclass> Objectclasses { get; set; }
 
     public virtual DbSet<RoofSurface> RoofSurfaces { get; set; }
@@ -470,6 +472,28 @@ public partial class CitydbV4DbContext : DbContext
                 .HasForeignKey(d => d.ImageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("image_surface_relations_image_id_fkey");
+        });
+
+        modelBuilder.Entity<Job>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("jobs_pkey");
+
+            entity.ToTable("jobs", "citydb");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('jobs_id_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Message).HasColumnName("message");
+            entity.Property(e => e.Parameter).HasColumnName("parameter");
+            entity.Property(e => e.ResultParameter).HasColumnName("result_parameter");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.Type).HasColumnName("type");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<Objectclass>(entity =>

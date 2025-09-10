@@ -1,15 +1,15 @@
 ﻿using PLATEAU.Snap.Models.Client;
 using PLATEAU.Snap.Models.Common;
 using PLATEAU.Snap.Models.Exceptions;
+using PLATEAU.Snap.Models.Settings;
 using PLATEAU.Snap.Server.Entities.Models;
-using PLATEAU.Snap.Server.Geoid;
 using PLATEAU.Snap.Server.Services;
 using PLATEAU.Snap.Server.Test.Fakes.Repositories;
 using PLATEAU.Snap.Server.Test.Fakes.Services;
 
 namespace PLATEAU.Snap.Server.Test.Services;
 
-public class SurfaceGeometryServiceTest
+public class TextureServiceTest
 {
     private static readonly NetTopologySuite.Geometries.GeometryFactory geometryFactory = new NetTopologySuite.Geometries.GeometryFactory();
 
@@ -20,6 +20,8 @@ public class SurfaceGeometryServiceTest
     private const int RoofCountPerBuilding = 2;
 
     private const int ImagePerFace = 4;
+
+    private const int SurfaceGeometryCount = 3;
 
     [Fact(DisplayName = "建物一覧")]
     [Trait("Category", "Unit")]
@@ -102,6 +104,35 @@ public class SurfaceGeometryServiceTest
         Assert.Equal(page, pageData.CurrentPage);
         Assert.False(pageData.HasNext);
         Assert.Empty(pageData.Values);
+    }
+
+    [Fact(DisplayName = "メッシュコード取得")]
+    [Trait("Category", "Unit")]
+    public async Task GetMeshCode()
+    {
+        var service = CreateService();
+
+        const int buildingId = 1;
+
+        var response = await service.GetMeshCodeAsync(buildingId);
+        Assert.NotEmpty(response.MeshCode);
+    }
+
+    [Fact(DisplayName = "メッシュコード取得 指定されたIDが存在しない")]
+    [Trait("Category", "Unit")]
+    public async Task GetMeshCodeIdNotExists()
+    {
+        var surfaceGeometryRepository = new FakeSurfaceGeometryRepository();
+        surfaceGeometryRepository.IsRoofprintNull = true;
+        var service = CreateService(surfaceGeometryRepository);
+
+        const int buildingId = 1000;
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            await service.GetMeshCodeAsync(buildingId);
+        });
+        Assert.Equal(typeof(NotFoundException), exception.GetType());
     }
 
     [Fact(DisplayName = "面一覧")]
@@ -300,29 +331,201 @@ public class SurfaceGeometryServiceTest
         Assert.Equal(typeof(NotFoundException), exception.GetType());
     }
 
-    private static SurfaceGeometryService CreateService()
+    [Fact(DisplayName = "テクスチャ更新")]
+    [Trait("Category", "Unit")]
+    public async Task ApplyTexture()
     {
-        var surfaceGeometryRepository = new FakeSurfaceGeometryRepository();
-        var cityBoundaryRepository = new FakeCityBoundaryRepository();
-        var imageRepository = new FakeImageRepository();
-        var imageProcessingService = new FakeImageProcessingService();
-        var grid = new Grid(null!);
+        var service = CreateService();
 
-        SeedFakeData(surfaceGeometryRepository);
+        const int buildingId = 1;
+        const int faceId = 1;
+        const string path = "s3://temp/transform.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
 
-        return new SurfaceGeometryService(surfaceGeometryRepository, cityBoundaryRepository, imageRepository, imageProcessingService, grid);
+        var request = new ApplyTextureRequest
+        {
+            BuildingId = buildingId,
+            FaceId = faceId,
+            Path = path,
+            Coordinates = coordinates,
+        };
+
+        await service.ApplyTextureAsync(request);
     }
 
-    private static SurfaceGeometryService CreateService(FakeSurfaceGeometryRepository surfaceGeometryRepository)
+    [Fact(DisplayName = "テクスチャ更新 紐づくSurfaceDataが複数")]
+    [Trait("Category", "Unit")]
+    public async Task ApplyTextureRelationSurfaceDataCount2()
     {
-        var cityBoundaryRepository = new FakeCityBoundaryRepository();
         var imageRepository = new FakeImageRepository();
-        var imageProcessingService = new FakeImageProcessingService();
-        var grid = new Grid(null!);
+        imageRepository.RelationSurfaceDataCount = 2;
+        var service = CreateService(imageRepository);
 
+        const int buildingId = 1;
+        const int faceId = 1;
+        const string path = "s3://temp/transform.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+
+        var request = new ApplyTextureRequest
+        {
+            BuildingId = buildingId,
+            FaceId = faceId,
+            Path = path,
+            Coordinates = coordinates,
+        };
+
+        await service.ApplyTextureAsync(request);
+    }
+
+    [Fact(DisplayName = "テクスチャ更新 紐づくTextureparamが存在しない")]
+    [Trait("Category", "Unit")]
+    public async Task ApplyTextureTextureparamNull()
+    {
+        var imageRepository = new FakeImageRepository();
+        imageRepository.IsTextureparamNull = true;
+        var service = CreateService(imageRepository);
+
+        const int buildingId = 1;
+        const int faceId = 1;
+        const string path = "s3://temp/transform.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+
+        var request = new ApplyTextureRequest
+        {
+            BuildingId = buildingId,
+            FaceId = faceId,
+            Path = path,
+            Coordinates = coordinates,
+        };
+
+        await service.ApplyTextureAsync(request);
+    }
+
+    [Fact(DisplayName = "テクスチャ更新 指定されたIDが存在しない")]
+    [Trait("Category", "Unit")]
+    public async Task ApplyTextureIdNotExists()
+    {
+        var imageRepository = new FakeImageRepository();
+        imageRepository.HasFace = false;
+        var service = CreateService(imageRepository);
+
+        const int buildingId = 1000;
+        const int faceId = 1000;
+        const string path = "s3://temp/transform.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+
+        var request = new ApplyTextureRequest
+        {
+            BuildingId = buildingId,
+            FaceId = faceId,
+            Path = path,
+            Coordinates = coordinates,
+        };
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            await service.ApplyTextureAsync(request);
+        });
+        Assert.Equal(typeof(NotFoundException), exception.GetType());
+    }
+
+    [Fact(DisplayName = "テクスチャ更新 TexImageがnull")]
+    [Trait("Category", "Unit")]
+    public async Task ApplyTextureTexImageNull()
+    {
+        var imageRepository = new FakeImageRepository();
+        imageRepository.IsTexImageNull = true;
+        var service = CreateService(imageRepository);
+
+        const int buildingId = 1;
+        const int faceId = 1;
+        const string path = "s3://temp/transform.png";
+        const string coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))";
+
+        var request = new ApplyTextureRequest
+        {
+            BuildingId = buildingId,
+            FaceId = faceId,
+            Path = path,
+            Coordinates = coordinates,
+        };
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            await service.ApplyTextureAsync(request);
+        });
+        Assert.Equal(typeof(InvalidOperationException), exception.GetType());
+    }
+
+    private static TextureService CreateService()
+    {
+        var imageRepository = new FakeImageRepository();
+        var jobRepository = new FakeJobRepository();
+        var surfaceGeometryRepository = new FakeSurfaceGeometryRepository();
+        var invokerService = new FakeInvokerService();
+        var appSettings = new AppSettings();
+        var databaseSettings = new DatabaseSettings();
+
+        SeedFakeData(imageRepository);
         SeedFakeData(surfaceGeometryRepository);
 
-        return new SurfaceGeometryService(surfaceGeometryRepository, cityBoundaryRepository, imageRepository, imageProcessingService, grid);
+        return new TextureService(imageRepository, jobRepository, invokerService, surfaceGeometryRepository, appSettings, databaseSettings);
+    }
+
+    private static TextureService CreateService(FakeImageRepository imageRepository)
+    {
+        var jobRepository = new FakeJobRepository();
+        var surfaceGeometryRepository = new FakeSurfaceGeometryRepository();
+        var invokerService = new FakeInvokerService();
+        var appSettings = new AppSettings();
+        var databaseSettings = new DatabaseSettings();
+
+        SeedFakeData(imageRepository);
+        SeedFakeData(surfaceGeometryRepository);
+
+        return new TextureService(imageRepository, jobRepository, invokerService, surfaceGeometryRepository, appSettings, databaseSettings);
+    }
+
+    private static TextureService CreateService(FakeSurfaceGeometryRepository surfaceGeometryRepository)
+    {
+        var imageRepository = new FakeImageRepository();
+        var jobRepository = new FakeJobRepository();
+        var invokerService = new FakeInvokerService();
+        var appSettings = new AppSettings();
+        var databaseSettings = new DatabaseSettings();
+
+        SeedFakeData(imageRepository);
+        SeedFakeData(surfaceGeometryRepository);
+
+        return new TextureService(imageRepository, jobRepository, invokerService, surfaceGeometryRepository, appSettings, databaseSettings);
+    }
+
+    private static void SeedFakeData(FakeImageRepository repository)
+    {
+        var wktWriter = new NetTopologySuite.IO.WKTWriter();
+        for (var surfaceGeometryId = 1; surfaceGeometryId <= SurfaceGeometryCount; surfaceGeometryId++)
+        {
+            var textureparam = new Textureparam
+            {
+                SurfaceGeometryId = surfaceGeometryId,
+                IsTextureParametrization = 1,
+                TextureCoordinates = geometryFactory.CreatePolygon(
+                [
+                    new NetTopologySuite.Geometries.Coordinate(10, 10),
+                    new NetTopologySuite.Geometries.Coordinate(10, 20),
+                    new NetTopologySuite.Geometries.Coordinate(20, 20),
+                    new NetTopologySuite.Geometries.Coordinate(20, 10),
+                    new NetTopologySuite.Geometries.Coordinate(10, 10),
+                ]),
+                SurfaceData = new SurfaceDatum
+                {
+                    TexImage = new TexImage()
+                    {
+                    }
+                },
+            };
+            repository.Textureparams.Add(textureparam);
+        }
     }
 
     private static void SeedFakeData(FakeSurfaceGeometryRepository repository)

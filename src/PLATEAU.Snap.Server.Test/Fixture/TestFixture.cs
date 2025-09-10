@@ -25,8 +25,7 @@ public class TestFixture
 
         // controller
         services
-            .AddScoped<CityDbController>()
-            .AddScoped<SurfacesController>();
+            .AddScoped<TexturesController>();
 
         // logging
         var outputHelper = new TestOutputHelper();
@@ -38,9 +37,9 @@ public class TestFixture
 
         // fake services
         services
-            .AddScoped<ICityDbService, FakeCityDbService>()
-            .AddScoped<IImageProcessingService, FakeImageProcessingService>()
-            .AddScoped<ISurfaceGeometryService, FakeSurfaceGeometryService>();
+            .AddScoped<IImporterExporterService, FakeImporterExporterService>()
+            .AddScoped<ITextureService, FakeTextureService>()
+            .AddScoped<IInvokerService, FakeInvokerService>();
 
         // auth handler
         var httpContext = new DefaultHttpContext();

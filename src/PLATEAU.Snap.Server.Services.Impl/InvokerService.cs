@@ -8,13 +8,13 @@ using PLATEAU.Snap.Models.Settings;
 
 namespace PLATEAU.Snap.Server.Services;
 
-internal class ImageProcessingService : IImageProcessingService
+internal class InvokerService : IInvokerService
 {
     private readonly IAmazonLambda lambda;
 
     private readonly LambdaSettings lambdaSettings;
 
-    public ImageProcessingService(IAmazonLambda lambda, LambdaSettings lambdaSettings)
+    public InvokerService(IAmazonLambda lambda, LambdaSettings lambdaSettings)
     {
         this.lambda = lambda;
         this.lambdaSettings = lambdaSettings;
@@ -45,6 +45,16 @@ internal class ImageProcessingService : IImageProcessingService
         ValidateCoordinates(response.TextureCoordinates);
 
         return response;
+    }
+
+    public async Task ExportBuildingAsync(LambdaExportBuildingRequest request)
+    {
+        await InvokeLambdaAsync(this.lambdaSettings.ExportBuildingFunctionName, request);
+    }
+
+    public async Task ExportMeshAsync(LambdaExportMeshRequest request)
+    {
+        await InvokeLambdaAsync(this.lambdaSettings.ExportMeshFunctionName, request);
     }
 
     private async Task<TResponse> InvokeLambdaAsync<TRequest, TResponse>(string functionName, TRequest request) where TResponse : LambdaResponseBody
@@ -86,6 +96,33 @@ internal class ImageProcessingService : IImageProcessingService
             }
 
             return responseBody;
+        }
+        catch (Exception ex)
+        {
+            throw new LambdaOperationException($"Failed to invoke Lambda function '{functionName}': {ex.Message}", ex);
+        }
+    }
+
+    private async Task InvokeLambdaAsync<TRequest>(string functionName, TRequest request)
+    {
+        try
+        {
+            var invokeRequest = new InvokeRequest
+            {
+                FunctionName = functionName,
+                // .NETのLambdaはCamelCaseでシリアライズ/デシリアライズされるため
+                Payload = Util.SerializeCamelCase(request),
+                InvocationType = InvocationType.Event
+            };
+
+            var invokeResponse = await this.lambda.InvokeAsync(invokeRequest);
+            if (invokeResponse.HttpStatusCode != System.Net.HttpStatusCode.Accepted)
+            {
+                using var errorReader = new StreamReader(invokeResponse.Payload);
+                var errorJson = await errorReader.ReadToEndAsync();
+                var errorResponse = Util.DeserializeCamelCase<LambdaErrorResponse>(errorJson);
+                throw new LambdaOperationException($"Lambda function invocation failed: [{invokeResponse.HttpStatusCode}]{errorResponse?.ErrorMessage ?? "Unknown error"}");
+            }
         }
         catch (Exception ex)
         {

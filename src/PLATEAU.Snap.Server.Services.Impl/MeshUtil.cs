@@ -10,6 +10,48 @@ internal static class MeshUtil
     private const double AreaComparisonTolerance = 1e-10;
 
     /// <summary>
+    /// 3次メッシュコードから Envelope を返します。
+    /// </summary>
+    /// <param name="meshCode">3次メッシュコード（8桁）</param>
+    /// <returns>3次メッシュコードのEnvelope</returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static Envelope GetEnvelopeFromThirdMeshCode(string meshCode)
+    {
+        if (meshCode is null || meshCode.Length != 8)
+        {
+            throw new ArgumentException("3次メッシュコードは8桁で指定してください。", nameof(meshCode));
+        }
+
+        // 1次メッシュ
+        int p = int.Parse(meshCode.Substring(0, 2)); // 緯度部分
+        int a = int.Parse(meshCode.Substring(2, 2)); // 経度部分
+
+        // 2次メッシュ
+        int q = int.Parse(meshCode.Substring(4, 1)); // 南北方向
+        int r = int.Parse(meshCode.Substring(5, 1)); // 東西方向
+
+        // 3次メッシュ
+        int s = int.Parse(meshCode.Substring(6, 1)); // 南北方向
+        int t = int.Parse(meshCode.Substring(7, 1)); // 東西方向
+
+        // 緯度の計算
+        double lat = p / 1.5; // 1次メッシュの南端緯度
+        lat += q * (5.0 / 60.0); // 2次メッシュ分
+        lat += s * (30.0 / 3600.0); // 3次メッシュ分
+
+        // 経度の計算
+        double lon = a + 100; // 1次メッシュの西端経度
+        lon += r * (7.5 / 60.0); // 2次メッシュ分
+        lon += t * (45.0 / 3600.0); // 3次メッシュ分
+
+        // 3次メッシュのサイズ
+        double latSize = 30.0 / 3600.0;
+        double lonSize = 45.0 / 3600.0;
+
+        return new Envelope(lon, lon + lonSize, lat, lat + latSize);
+    }
+
+    /// <summary>
     /// ジオメトリを受け取って3次メッシュコードを返します。
     /// ジオメトリの座標は経度, 緯度の順でX, Yに入っています。
     /// ジオメトリがメッシュの境界に位置している場合、以下の仕様でメッシュを決定します：
@@ -186,7 +228,7 @@ internal static class MeshUtil
             new Coordinate(neLon, swLat),
             new Coordinate(neLon, neLat),
             new Coordinate(swLon, neLat),
-            new Coordinate(swLon, swLat) // 閉じる
+            new Coordinate(swLon, swLat)
         };
 
         var factory = new GeometryFactory();

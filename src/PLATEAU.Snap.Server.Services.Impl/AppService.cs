@@ -1,6 +1,4 @@
-﻿using NetTopologySuite.IO;
-using PLATEAU.Snap.Models.Common;
-using PLATEAU.Snap.Models.Exceptions;
+﻿using PLATEAU.Snap.Models.Exceptions;
 using PLATEAU.Snap.Models.Extensions.Numerics;
 using PLATEAU.Snap.Models.Server;
 using PLATEAU.Snap.Server.Geoid;
@@ -10,10 +8,8 @@ using SixLabors.ImageSharp.Processing;
 
 namespace PLATEAU.Snap.Server.Services;
 
-internal class SurfaceGeometryService : ISurfaceGeometryService
+internal class AppService : IAppService
 {
-    private const int ExpiryInMinutes = 60;
-
     private const int ThumbnailWidth = 300;
 
     private const int ThumbnailHeight = 300;
@@ -24,16 +20,13 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
 
     private readonly IImageRepository imageRepository;
 
-    private readonly IImageProcessingService imageProcessingService;
-
     private readonly Grid grid;
 
-    public SurfaceGeometryService(ISurfaceGeometryRepository repository, ICityBoundaryRepository cityBoundaryRepository, IImageRepository imageRepository, IImageProcessingService imageProcessingService, Grid grid)
+    public AppService(ISurfaceGeometryRepository repository, ICityBoundaryRepository cityBoundaryRepository, IImageRepository imageRepository, Grid grid)
     {
         this.repository = repository;
         this.cityBoundaryRepository = cityBoundaryRepository;
         this.imageRepository = imageRepository;
-        this.imageProcessingService = imageProcessingService;
         this.grid = grid;
     }
 
@@ -91,85 +84,6 @@ internal class SurfaceGeometryService : ISurfaceGeometryService
                 Exception = ex
             };
         }
-    }
-
-    public async Task<PageData<BuildingImage>> GetBuildingsAsync(SortType sortType, int pageNumber, int pageSize)
-    {
-        var pageList = await this.repository.GetBuildingsAsync(sortType, pageNumber, pageSize);
-        return pageList.CreatePageData();
-    }
-
-    public async Task<PageData<FaceImageInfo>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
-    {
-        if (!(await this.repository.ExistsAsync(buildingId)))
-        {
-            throw new NotFoundException();
-        }
-
-        var pageList = await this.repository.GetFacesAsync(buildingId, sortType, pageNumber, pageSize);
-        return pageList.CreatePageDataWithSelect(x => new FaceImageInfo(x.FaceId!.Value, x.Gmlid, x.Thumbnail, x.Timestamp, x.IsOrtho!.Value));
-    }
-
-    public async Task<PageData<ImageInfo>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)
-    {
-        if (!(await this.repository.ExistsAsync(buildingId, faceId)))
-        {
-            throw new NotFoundException();
-        }
-
-        var pageList = await this.repository.GetFaceImagesAsync(buildingId, faceId, sortType, pageNumber, pageSize);
-        return pageList.CreatePageDataWithSelect(x => new ImageInfo(x.ImageId, x.Gmlid, x.Thumbnail, x.Timestamp, x.IsOrtho!.Value));
-    }
-
-    public async Task<Models.Client.TransformResponse> TransformAsync(Models.Client.TransformRequest payload)
-    {
-        var surfaceImage = await this.repository.GetSurfaceImageAsync(payload.BuildingId, payload.FaceId, payload.ImageId);
-        if (surfaceImage is null)
-        {
-            throw new NotFoundException();
-        }
-
-        // アスペクト比の計算にジオイド高は考慮する必要がないため、ここでは無視する
-        var wkt = await this.repository.GetFaceWktAsync(payload.FaceId);
-        if (wkt is null)
-        {
-            throw new InvalidOperationException("The face geometry is not available.");
-        }
-
-        var writer = new WKTWriter();
-        var coordinates = writer.Write(surfaceImage.Coordinates);
-
-        var response = await imageProcessingService.TransformAsync(new Models.Lambda.LambdaTransformRequest()
-        {
-            Path = surfaceImage.Uri!,
-            Coordinates = coordinates,
-            Geometry = wkt
-        });
-
-        var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync(response.Path, ExpiryInMinutes);
-
-        return new Models.Client.TransformResponse(response.Path, preSignedURL, response.Coordinates);
-    }
-
-    public async Task<Models.Client.RoofExtractionResponse> RoofExtractionAsync(Models.Client.RoofExtractionRequest payload)
-    {
-        var roofSurface = await this.repository.GetRoofSurfaceAsync(payload.BuildingId, payload.FaceId);
-        if (roofSurface is null)
-        {
-            throw new NotFoundException();
-        }
-
-        var writer = new WKTWriter();
-        var geometry = writer.Write(roofSurface.Geom);
-
-        var response = await imageProcessingService.RoofExtractionAsync(new Models.Lambda.LambdaRoofExtractionRequest()
-        {
-            Geometry = geometry
-        });
-
-        var preSignedURL = await this.imageRepository.GeneratePreSignedURLAsync(response.Path, ExpiryInMinutes);
-
-        return new Models.Client.RoofExtractionResponse(response.Path, preSignedURL, response.Coordinates);
     }
 
     private static byte[] CreateThumbnailAsBytes(Stream inputStream, int width, int height)

@@ -15,6 +15,8 @@ internal class FakeSurfaceGeometryRepository : ISurfaceGeometryRepository
 
     public bool IsFaceWktNull { get; set; }
 
+    public bool IsRoofprintNull { get; set; }
+
     public Task<List<PolygonInfo>> GetPolygonInfoAsync(VisibleSurfacesRequest request, int srid)
     {
         throw new NotImplementedException();
@@ -134,6 +136,11 @@ internal class FakeSurfaceGeometryRepository : ISurfaceGeometryRepository
 
     public Task<Geometry?> GetRoofprintAsync(int buildingId)
     {
+        if (IsRoofprintNull)
+        {
+            return Task.FromResult<Geometry?>(null);
+        }
+
         var geometry = geometryFactory.CreatePolygon(
         [
             new Coordinate(139.77269201771884, 35.64980103144675),
@@ -141,5 +148,15 @@ internal class FakeSurfaceGeometryRepository : ISurfaceGeometryRepository
             new Coordinate(139.77269201771884, 35.64980103144675),
         ]);
         return Task.FromResult<Geometry?>(geometry);
+    }
+
+    public Task<List<int>> GetIntersectionsAsync(Polygon envelope)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<List<GeometryInfo>> GetNotContainsAsync(Polygon envelope, int[] includeIds)
+    {
+        throw new NotImplementedException();
     }
 }

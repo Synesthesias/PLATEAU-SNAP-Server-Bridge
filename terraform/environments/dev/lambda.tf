@@ -16,18 +16,33 @@ locals {
     },
     "${local.app_name}-texture_building" = {
       handler               = "src.texture_building.handler.lambda_handler"
-      memory                = 1024
+      memory                = 512
       timeout               = 60
       needs_internet_access = false
       description           = "Builds texture for 3d models"
     }
   }
-
+  export_functions = {
+    "${local.app_name}-export_building" = {
+      handler               = "PLATEAU.Snap.Server.Lambda::PLATEAU.Snap.Server.Lambda.Function::ExportBuilding"
+      memory                = 1024
+      timeout               = 120
+      needs_internet_access = false
+      description           = "Handles data export to S3"
+    },
+    "${local.app_name}-export_mesh" = {
+      handler               = "PLATEAU.Snap.Server.Lambda::PLATEAU.Snap.Server.Lambda.Function::ExportMesh"
+      memory                = 2048
+      timeout               = 300
+      needs_internet_access = false
+      description           = "Handles data export to S3"
+    }
+  }
 }
 
 data "aws_ecr_image" "latest" {
   repository_name = aws_ecr_repository.geo_lambda_image.name
-  most_recent = true
+  most_recent     = true
 }
 
 resource "aws_lambda_function" "geo_lambdas" {
@@ -36,7 +51,7 @@ resource "aws_lambda_function" "geo_lambdas" {
   function_name = each.key
   architectures = ["arm64"]
   role          = aws_iam_role.lambda_exec_role.arn
-  depends_on = [aws_cloudwatch_log_group.lambda_logs] # logs must exist before lambda deployment
+  depends_on    = [aws_cloudwatch_log_group.lambda_logs] # logs must exist before lambda deployment
 
   # Note: Docker image must be built with --provenance=false to avoid Lambda manifest compatibility issues
   package_type = "Image"
@@ -110,4 +125,69 @@ resource "aws_iam_role_policy" "lambda_s3" {
       ]
     }]
   })
+}
+
+resource "aws_iam_role_policy" "lambda_secrets" {
+  name = "lambda_secrets_access"
+  role = aws_iam_role.lambda_exec_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ],
+        Resource = aws_secretsmanager_secret.default.arn
+      }
+    ]
+  })
+}
+
+data "aws_ecr_image" "export_lambda_image" {
+  repository_name = aws_ecr_repository.export_lambda_image.name
+  most_recent     = true
+}
+
+resource "aws_lambda_function" "export_lambdas" {
+  for_each = local.export_functions
+
+  function_name = each.key
+  architectures = ["x86_64"]
+  role          = aws_iam_role.lambda_exec_role.arn
+  depends_on    = [aws_cloudwatch_log_group.lambda_logs] # logs must exist before lambda deployment
+
+  # Note: Docker image must be built with --provenance=false to avoid Lambda manifest compatibility issues
+  package_type = "Image"
+  image_uri    = "${aws_ecr_repository.export_lambda_image.repository_url}@${data.aws_ecr_image.export_lambda_image.image_digest}"
+  memory_size  = each.value.memory
+  timeout      = each.value.timeout
+  description  = each.value.description
+
+  image_config {
+    command = [each.value.handler]
+  }
+  tracing_config {
+    mode = "Active"
+  }
+
+  vpc_config {
+    subnet_ids = [aws_subnet.private_1a.id]
+    security_group_ids = [
+      aws_security_group.lambda_sg_s3_only.id,
+      aws_security_group.lambda_rds.id
+    ]
+  }
+
+  environment {
+    variables = {
+      SECRET_NAME = aws_secretsmanager_secret.default.name
+    }
+  }
+}
+resource "aws_cloudwatch_log_group" "export_lambda_logs" {
+  for_each          = local.export_functions
+  name              = "/aws/lambda/${each.key}"
+  retention_in_days = 30
 }

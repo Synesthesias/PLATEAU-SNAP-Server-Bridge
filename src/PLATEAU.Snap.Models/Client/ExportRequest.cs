@@ -11,6 +11,6 @@ public class ExportRequest
     public int Id { get; set; }
 
     [ZipFileName]
-    [SwaggerSchema("ダウンロードするファイルの名前(拡張子はzip。未指定時は {id}.zip となる)", Nullable = true)]
+    [SwaggerSchema("ダウンロードするファイルの名前(拡張子はzip。未指定時は {job_id}.zip となる)", Nullable = true)]
     public string? FileName { get; set; }
 }

@@ -8,9 +8,17 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection UseDefaultServices(this IServiceCollection services)
     {
         return services
-            .AddScoped<ISurfaceGeometryService, SurfaceGeometryService>()
-            .AddScoped<ICityDbService, CityDbService>()
-            .AddScoped<IImageProcessingService, ImageProcessingService>()
+            .AddScoped<IAppService, AppService>()
+            .AddScoped<IImporterExporterService, ImporterExporterService>()
+            .AddScoped<IInvokerService, InvokerService>()
+            .AddScoped<IJobService, JobService>()
+            .AddScoped<ITextureService, TextureService>()
             .AddAWSService<IAmazonLambda>();
+    }
+
+    public static IServiceCollection UseImporterExporter(this IServiceCollection services)
+    {
+        return services
+            .AddScoped<IImporterExporterService, ImporterExporterService>();
     }
 }

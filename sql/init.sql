@@ -91,6 +91,17 @@ CREATE TABLE IF NOT EXISTS citydb.surface_centroid
     building_id integer NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS jobs (
+    id bigserial PRIMARY KEY,
+    type text NOT NULL,
+    status text NOT NULL,
+    parameter text,
+    result_parameter text,
+    message text,
+    created_at timestamp with time zone NOT NULL DEFAULT current_timestamp,
+    updated_at timestamp with time zone NOT NULL DEFAULT current_timestamp
+);
+
 WITH t AS (
     SELECT sg.*,b.id AS building_id FROM citydb.building AS b
     JOIN surface_geometry AS sg ON b.lod2_solid_id=sg.root_id

@@ -5,7 +5,7 @@ using PLATEAU.Snap.Server.Services;
 
 namespace PLATEAU.Snap.Server.Test.Fakes.Services;
 
-internal class FakeImageProcessingService : IImageProcessingService
+internal class FakeInvokerService : IInvokerService
 {
     private GeometryFactory geometryFactory = new ();
 
@@ -63,5 +63,15 @@ internal class FakeImageProcessingService : IImageProcessingService
             Path = "s3://temp/apply_texture.png",
             TextureCoordinates = wktWriter.Write(polygon),
         });
+    }
+
+    public async Task ExportBuildingAsync(LambdaExportBuildingRequest request)
+    {
+        await Task.CompletedTask;
+    }
+
+    public async Task ExportMeshAsync(LambdaExportMeshRequest request)
+    {
+        await Task.CompletedTask;
     }
 }

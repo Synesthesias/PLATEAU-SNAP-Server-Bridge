@@ -34,25 +34,25 @@ resource "aws_security_group" "rds" {
 }
 
 resource "aws_security_group" "lambda_sg_s3_only" {
-  name = "${local.app_name}-lambda-sg-s3-only"
+  name        = "${local.app_name}-lambda-sg-s3-only"
   description = "Allow outbound traffic to S3 Gateway Endpoint"
-  vpc_id      = aws_vpc.default.id 
+  vpc_id      = aws_vpc.default.id
 
   tags = {
     Name = "${local.app_name}-lambda-sg-s3-only"
   }
 
   egress {
-    description = "HTTPS to S3 Gateway Endpoint for bucket operations"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
+    description     = "HTTPS to S3 Gateway Endpoint for bucket operations"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
     prefix_list_ids = [data.aws_prefix_list.s3.id]
-    }
+  }
 }
 
 resource "aws_security_group" "lambda_sg_internet_access" {
-  name = "${local.app_name}-lambda-sg-internet-access"
+  name        = "${local.app_name}-lambda-sg-internet-access"
   description = "Allow all outbound traffic"
   vpc_id      = aws_vpc.default.id
 
@@ -66,6 +66,15 @@ resource "aws_security_group" "lambda_sg_internet_access" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "lambda_rds" {
+  name        = "${local.app_name}-lambda-rds-sg"
+  description = "Security Group for RDS"
+  vpc_id      = aws_vpc.default.id
+  tags = {
+    Name = "${local.app_name}-lambda-rds-sg"
   }
 }
 
@@ -120,6 +129,24 @@ resource "aws_security_group_rule" "rds_in_rds" {
 
 resource "aws_security_group_rule" "rds_out_any" {
   security_group_id = aws_security_group.rds.id
+  type              = "egress"
+  protocol          = "-1"
+  from_port         = 0
+  to_port           = 0
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "rds_in_lambda" {
+  security_group_id        = aws_security_group.rds.id
+  type                     = "ingress"
+  protocol                 = "tcp"
+  from_port                = 5432
+  to_port                  = 5432
+  source_security_group_id = aws_security_group.lambda_rds.id
+}
+
+resource "aws_security_group_rule" "lambda_rds_out_any" {
+  security_group_id = aws_security_group.lambda_rds.id
   type              = "egress"
   protocol          = "-1"
   from_port         = 0

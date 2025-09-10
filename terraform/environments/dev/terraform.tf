@@ -1,15 +1,16 @@
 locals {
   aws = {
-    region                = "<AWS Region>"
+    region = "ap-northeast-1"
+    # profile = "<AWS CLI profile name>"
   }
 
   app_name_prefix = "plateausnap"
-  stage           = "<Stage>"
-  cidr_prefix     = "<CIDR Prefix e.g. 10.0>"
+  stage           = "dev"
+  cidr_prefix     = "10.0"
 
   iam = {
-    group_name = "<IAM Group of user executing the application>"
-    user_name  = "<IAM User of executing the application>"
+    group_name = "snap-dev-group"
+    user_name  = "snap-dev-user"
   }
 
   ec2 = {

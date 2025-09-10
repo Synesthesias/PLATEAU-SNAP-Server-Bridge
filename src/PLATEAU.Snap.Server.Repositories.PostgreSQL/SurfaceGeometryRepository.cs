@@ -111,7 +111,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
     public async Task<PageList<BuildingImage>> GetBuildingsAsync(SortType sortType, int pageNumber, int pageSize)
     {
-        var query = Context.Database.SqlQueryRaw<BuildingImage>(@$"
+        var query = Context.Database.SqlQueryRaw<BuildingImage>(@"
             SELECT
               DISTINCT ON (building_id)
               building_id AS id,
@@ -138,7 +138,7 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
     public async Task<PageList<BuildingFace>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
     {
         var param = new NpgsqlParameter("buildingId", buildingId);
-        var query = Context.Database.SqlQueryRaw<BuildingFace>(@$"
+        var query = Context.Database.SqlQueryRaw<BuildingFace>(@"
             WITH ranked AS (
               SELECT
                 bf.*,
@@ -270,5 +270,49 @@ internal class SurfaceGeometryRepository : BaseRepository, ISurfaceGeometryRepos
 
         using var reader = await command.ExecuteReaderAsync();
         return await reader.ReadAsync() ? await reader.GetFieldValueAsync<Geometry>(0) : null;
+    }
+
+    public async Task<List<int>> GetIntersectionsAsync(Polygon envelope)
+    {
+        envelope.SRID = 4326;
+        var param = new NpgsqlParameter("envelope", envelope)
+        {
+            NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Geometry
+        };
+
+        var query = Context.Database.SqlQueryRaw<int>(@"
+            WITH t AS(
+              SELECT b.id AS building_id,ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326) AS roofprint FROM building AS b
+              JOIN surface_geometry AS sg ON b.lod0_roofprint_id=sg.root_id
+              WHERE parent_id IS NOT NULL
+            )
+            SELECT building_id FROM t
+            WHERE ST_Intersects(@envelope, roofprint);", param);
+
+        return await query.ToListAsync();
+    }
+
+    public async Task<List<GeometryInfo>> GetNotContainsAsync(Polygon envelope, int[] includeIds)
+    {
+        var idListParam = new NpgsqlParameter("idList", includeIds)
+        {
+            NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Integer
+        };
+        envelope.SRID = 4326;
+        var envParam = new NpgsqlParameter("envelope", envelope)
+        {
+            NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Geometry
+        };
+
+        var query = Context.Database.SqlQueryRaw<GeometryInfo>(@"
+            WITH t AS(
+              SELECT b.id AS building_id,ST_Transform(ST_FlipCoordinates(ST_Force2D(geometry)), 4326) AS roofprint FROM building AS b
+              JOIN surface_geometry AS sg ON b.lod0_roofprint_id=sg.root_id
+              WHERE parent_id IS NOT NULL
+            )
+            SELECT building_id AS id,roofprint AS geom FROM t
+            WHERE building_id = ANY (@idList) AND NOT ST_Contains(@envelope, roofprint);", idListParam, envParam);
+
+        return await query.ToListAsync();
     }
 }

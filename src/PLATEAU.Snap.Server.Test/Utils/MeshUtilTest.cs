@@ -438,4 +438,234 @@ public class MeshUtilTest
 
         return new Coordinate(centerLon, centerLat);
     }
+
+    #region GetEnvelopeFromThirdMeshCode Tests
+
+    [Fact(DisplayName = "東京駅周辺の3次メッシュコードからエンベロープを取得")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_TokyoStationMeshCode_ReturnsCorrectEnvelope()
+    {
+        // 東京駅周辺のメッシュコード
+        var meshCode = "53394611";
+
+        var envelope = MeshUtil.GetEnvelopeFromThirdMeshCode(meshCode);
+
+        Assert.NotNull(envelope);
+        
+        // 東京駅の座標（経度139.766084, 緯度35.681167）がエンベロープ内にあることを確認
+        Assert.True(envelope.Contains(139.766084, 35.681167));
+        
+        // エンベロープのサイズが3次メッシュのサイズと一致することを確認
+        var expectedLatSize = 30.0 / 3600.0; // 30秒 = 1/120度
+        var expectedLonSize = 45.0 / 3600.0; // 45秒 = 1/80度
+        
+        Assert.Equal(expectedLatSize, envelope.Height, 8);
+        Assert.Equal(expectedLonSize, envelope.Width, 8);
+    }
+
+    [Fact(DisplayName = "大阪駅周辺の3次メッシュコードからエンベロープを取得")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_OsakaStationMeshCode_ReturnsCorrectEnvelope()
+    {
+        // 大阪駅周辺のメッシュコード
+        var meshCode = "52350349";
+
+        var envelope = MeshUtil.GetEnvelopeFromThirdMeshCode(meshCode);
+
+        Assert.NotNull(envelope);
+        
+        // 大阪駅の座標（経度135.496042, 緯度34.702439）がエンベロープ内にあることを確認
+        Assert.True(envelope.Contains(135.496042, 34.702439));
+        
+        // エンベロープのサイズが3次メッシュのサイズと一致することを確認
+        var expectedLatSize = 30.0 / 3600.0;
+        var expectedLonSize = 45.0 / 3600.0;
+        
+        Assert.Equal(expectedLatSize, envelope.Height, 8);
+        Assert.Equal(expectedLonSize, envelope.Width, 8);
+    }
+
+    [Fact(DisplayName = "基準座標の3次メッシュコードからエンベロープを取得")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_BaseCoordinate_ReturnsCorrectEnvelope()
+    {
+        // 計算しやすい基準座標のメッシュコード
+        var meshCode = "54400000";
+
+        var envelope = MeshUtil.GetEnvelopeFromThirdMeshCode(meshCode);
+
+        Assert.NotNull(envelope);
+        
+        // 期待される座標範囲
+        var expectedMinLon = 140.0;
+        var expectedMaxLon = 140.0 + 45.0 / 3600.0;
+        var expectedMinLat = 36.0;
+        var expectedMaxLat = 36.0 + 30.0 / 3600.0;
+        
+        Assert.Equal(expectedMinLon, envelope.MinX, 8);
+        Assert.Equal(expectedMaxLon, envelope.MaxX, 8);
+        Assert.Equal(expectedMinLat, envelope.MinY, 8);
+        Assert.Equal(expectedMaxLat, envelope.MaxY, 8);
+    }
+
+    [Theory(DisplayName = "様々な3次メッシュコードからエンベロープを取得")]
+    [Trait("Category", "Unit")]
+    [InlineData("52354000")] // 関西地方
+    [InlineData("49304000")] // 九州地方
+    [InlineData("60400000")] // 東北地方
+    [InlineData("54360000")] // 中部地方
+    public void GetEnvelopeFromThirdMeshCode_VariousMeshCodes_ReturnsValidEnvelope(string meshCode)
+    {
+        var envelope = MeshUtil.GetEnvelopeFromThirdMeshCode(meshCode);
+
+        Assert.NotNull(envelope);
+        
+        // エンベロープの基本的な性質を確認
+        Assert.True(envelope.Width > 0);
+        Assert.True(envelope.Height > 0);
+        Assert.True(envelope.MinX < envelope.MaxX);
+        Assert.True(envelope.MinY < envelope.MaxY);
+        
+        // 3次メッシュのサイズと一致することを確認
+        var expectedLatSize = 30.0 / 3600.0;
+        var expectedLonSize = 45.0 / 3600.0;
+        
+        Assert.Equal(expectedLatSize, envelope.Height, 8);
+        Assert.Equal(expectedLonSize, envelope.Width, 8);
+    }
+
+    [Fact(DisplayName = "不正な長さのメッシュコードで例外が発生")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_InvalidLength_ThrowsArgumentException()
+    {
+        // 7桁のメッシュコード（不正）
+        var shortMeshCode = "5339461";
+        
+        var exception = Assert.Throws<ArgumentException>(() => 
+            MeshUtil.GetEnvelopeFromThirdMeshCode(shortMeshCode));
+        
+        Assert.Contains("3次メッシュコードは8桁で指定してください", exception.Message);
+        Assert.Equal("meshCode", exception.ParamName);
+        
+        // 9桁のメッシュコード（不正）
+        var longMeshCode = "533946111";
+        
+        exception = Assert.Throws<ArgumentException>(() => 
+            MeshUtil.GetEnvelopeFromThirdMeshCode(longMeshCode));
+        
+        Assert.Contains("3次メッシュコードは8桁で指定してください", exception.Message);
+        Assert.Equal("meshCode", exception.ParamName);
+    }
+
+    [Fact(DisplayName = "空文字のメッシュコードで例外が発生")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_EmptyString_ThrowsArgumentException()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => 
+            MeshUtil.GetEnvelopeFromThirdMeshCode(""));
+        
+        Assert.Contains("3次メッシュコードは8桁で指定してください", exception.Message);
+        Assert.Equal("meshCode", exception.ParamName);
+    }
+
+    [Fact(DisplayName = "nullのメッシュコードで例外が発生")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_NullString_ThrowsArgumentException()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => 
+            MeshUtil.GetEnvelopeFromThirdMeshCode(null!));
+        
+        Assert.Contains("3次メッシュコードは8桁で指定してください", exception.Message);
+        Assert.Equal("meshCode", exception.ParamName);
+    }
+
+    [Fact(DisplayName = "数字以外を含むメッシュコードで例外が発生")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_NonNumericCharacters_ThrowsFormatException()
+    {
+        var invalidMeshCode = "5339461a";
+        
+        Assert.Throws<FormatException>(() => 
+            MeshUtil.GetEnvelopeFromThirdMeshCode(invalidMeshCode));
+    }
+
+    [Fact(DisplayName = "エンベロープとメッシュコードの往復変換テスト")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_RoundTrip_ConsistentResults()
+    {
+        var originalMeshCode = "53394611";
+        
+        // メッシュコードからエンベロープを取得
+        var envelope = MeshUtil.GetEnvelopeFromThirdMeshCode(originalMeshCode);
+        
+        // エンベロープの中心点を使ってポリゴンを作成
+        var centerX = (envelope.MinX + envelope.MaxX) / 2;
+        var centerY = (envelope.MinY + envelope.MaxY) / 2;
+        var smallOffset = 0.00001; // エンベロープ内に確実に収まる小さなオフセット
+        
+        var coords = new[]
+        {
+            new Coordinate(centerX - smallOffset, centerY - smallOffset),
+            new Coordinate(centerX + smallOffset, centerY - smallOffset),
+            new Coordinate(centerX + smallOffset, centerY + smallOffset),
+            new Coordinate(centerX - smallOffset, centerY + smallOffset),
+            new Coordinate(centerX - smallOffset, centerY - smallOffset)
+        };
+        var polygon = geometryFactory.CreatePolygon(coords);
+        
+        // ポリゴンからメッシュコードを逆算
+        var calculatedMeshCode = MeshUtil.GetThirdMeshCode(polygon);
+        
+        // 元のメッシュコードと一致することを確認
+        Assert.Equal(originalMeshCode, calculatedMeshCode);
+    }
+
+    [Fact(DisplayName = "連続するメッシュコードのエンベロープが隣接している")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_AdjacentMeshCodes_EnvelopesAreAdjacent()
+    {
+        // 隣接する3次メッシュコード（東西方向）
+        var meshCode1 = "53394611";
+        var meshCode2 = "53394612"; // 東隣のメッシュ
+        
+        var envelope1 = MeshUtil.GetEnvelopeFromThirdMeshCode(meshCode1);
+        var envelope2 = MeshUtil.GetEnvelopeFromThirdMeshCode(meshCode2);
+        
+        // 東西方向で隣接していることを確認
+        Assert.Equal(envelope1.MaxX, envelope2.MinX, 10);
+        
+        // 南北方向は同じ範囲であることを確認
+        Assert.Equal(envelope1.MinY, envelope2.MinY, 10);
+        Assert.Equal(envelope1.MaxY, envelope2.MaxY, 10);
+    }
+
+    [Fact(DisplayName = "エンベロープの座標が妥当な範囲内にある")]
+    [Trait("Category", "Unit")]
+    public void GetEnvelopeFromThirdMeshCode_ValidCoordinateRange_WithinJapan()
+    {
+        // 日本国内の実際のメッシュコード
+        var japanMeshCodes = new[]
+        {
+            "53394611", // 東京
+            "52350349", // 大阪
+            "49304000", // 九州
+            "60400000", // 東北
+            "54360000"  // 中部
+        };
+        
+        foreach (var meshCode in japanMeshCodes)
+        {
+            var envelope = MeshUtil.GetEnvelopeFromThirdMeshCode(meshCode);
+            
+            // 日本の経度範囲（約123度〜146度）
+            Assert.True(envelope.MinX >= 120 && envelope.MaxX <= 150, 
+                $"Longitude out of range for mesh code {meshCode}: {envelope.MinX} - {envelope.MaxX}");
+            
+            // 日本の緯度範囲（約24度〜46度）
+            Assert.True(envelope.MinY >= 20 && envelope.MaxY <= 50, 
+                $"Latitude out of range for mesh code {meshCode}: {envelope.MinY} - {envelope.MaxY}");
+        }
+    }
+
+    #endregion
 }

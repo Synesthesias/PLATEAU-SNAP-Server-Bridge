@@ -4,7 +4,7 @@ using PLATEAU.Snap.Server.Services;
 
 namespace PLATEAU.Snap.Server.Test.Fakes.Services;
 
-internal class FakeSurfaceGeometryService : ISurfaceGeometryService
+internal class FakeTextureService : ITextureService
 {
     public List<BuildingImage> BuildingImages { get; } = new();
 
@@ -27,10 +27,20 @@ internal class FakeSurfaceGeometryService : ISurfaceGeometryService
         return await Task.FromResult(PageList<BuildingImage>.ToPageList(BuildingImages.AsQueryable(), pageNumber, pageSize).CreatePageData());
     }
 
+    public Task<MeshCodeResponse> GetMeshCodeAsync(int buildingId)
+    {
+        var response = new MeshCodeResponse
+        {
+            MeshCode = "53394509",
+        };
+        return Task.FromResult(response);
+    }
+
     public Task<PageData<FaceImageInfo>> GetFacesAsync(int buildingId, SortType sortType, int pageNumber, int pageSize)
     {
         return Task.FromResult(PageList<FaceImageInfo>.ToPageList(FaceImages.AsQueryable(), pageNumber, pageSize).CreatePageData());
     }
+
     public Task<PageData<ImageInfo>> GetFaceImagesAsync(int buildingId, int faceId, SortType sortType, int pageNumber, int pageSize)
     {
         return Task.FromResult(PageList<ImageInfo>.ToPageList(FaceImageInfos.AsQueryable(), pageNumber, pageSize).CreatePageData());
@@ -56,5 +66,31 @@ internal class FakeSurfaceGeometryService : ISurfaceGeometryService
             Coordinates = "POLYGON((10 10, 10 20, 20 20, 20 10, 10 10))",
         };
         return Task.FromResult(response);
+    }
+
+    public Task<PreviewTextureResponse> PreviewTextureRequest(PreviewTextureRequest payload)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task ApplyTextureAsync(ApplyTextureRequest payload)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<Job> ExportAsync(int id, string? fileName)
+    {
+        return Task.FromResult(new Job
+        {
+            Id = 1
+        });
+    }
+
+    public Task<Job> ExportAsync(string meshCode, string? fileName)
+    {
+        return Task.FromResult(new Job
+        {
+            Id = 1
+        });
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Npgsql;
+using PLATEAU.Snap.Models.Json;
 using PLATEAU.Snap.Models.Settings;
 using PLATEAU.Snap.Server;
 using PLATEAU.Snap.Server.Entities;
@@ -72,6 +73,8 @@ var lambdaSettings = new LambdaSettings()
     TransformFunctionName = configuration.GetValue<string>("TransformFunctionName") ?? throw new ArgumentNullException("TransformFunctionName"),
     RoofExtractionFunctionName = configuration.GetValue<string>("RoofExtractionFunctionName") ?? throw new ArgumentNullException("RoofExtractionFunctionName"),
     ApplyTextureFunctionName = configuration.GetValue<string>("ApplyTextureFunctionName") ?? throw new ArgumentNullException("ApplyTextureFunctionName"),
+    ExportBuildingFunctionName = configuration.GetValue<string>("ExportBuildingFunctionName") ?? throw new ArgumentNullException("ExportBuildingFunctionName"),
+    ExportMeshFunctionName = configuration.GetValue<string>("ExportMeshFunctionName") ?? throw new ArgumentNullException("ExportMeshFunctionName"),
 };
 
 // logging
@@ -116,6 +119,8 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
     options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    options.JsonSerializerOptions.Converters.Add(new JobParamConverter());
+    options.JsonSerializerOptions.Converters.Add(new JobResultParamConverter());
 });
 builder.Services.AddAuthentication(Constants.ApiAuthentication.AuthenticationScheme)
     .AddApiKeyAuthentication();
@@ -127,6 +132,7 @@ builder.Services.AddDbContext<CitydbV4DbContext>(options =>
     builder.Username = databaseSettings.Username;
     builder.Password = databaseSettings.Password;
     builder.Database = databaseSettings.Database;
+    builder.SslMode = SslMode.Require;
     options.UseNpgsql(builder.ConnectionString, o => o.UseNetTopologySuite());
     options.UseSnakeCaseNamingConvention();
 });
