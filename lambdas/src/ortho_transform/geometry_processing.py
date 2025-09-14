@@ -24,6 +24,7 @@ IntArray = npt.NDArray[np.int32]
 BoundingBox = Tuple[int, int, int, int] # (x_min, y_min, x_max, y_max)
 Dimensions = Tuple[int, int]
 TransformMatrix = npt.NDArray[np.float32]
+RectangleCorners = CoordList
 
 # Quality assessment
 QualityMetrics = Dict[str, float]
@@ -68,13 +69,11 @@ def _get_real_world_dimensions(geometry_pts: CoordList) -> Tuple[float, float]:
 
 def _prepare_geometry_for_transform(geometry_pts: CoordList, has_3d: bool = False) -> List[List[float]]:
     """Process geometry coordinates, handling 3D projection if needed."""
-    if has_3d and len(geometry_pts[0]) >= 3:
-        points_3d = np.array(geometry_pts)
-        yz_coords = _project_to_yz_plane_front_view(points_3d)
-        transformed_coords, origin = _normalize_coordinates_from_origin(yz_coords)
-        
-        max_y = transformed_coords[:, 1].max()
-        geometry = [[point[0], max_y - point[1]] for point in transformed_coords]
+    if has_3d and len(geometry_pts) > 0 and len(geometry_pts[0]) >= 3:
+        points_3d = np.array(geometry_pts, dtype=np.float32)
+        normalized_coords = _project_facade_to_2d(points_3d)
+        max_y = np.max(normalized_coords[:, 1])
+        geometry = [[pt[0], max_y - pt[1]] for pt in normalized_coords]
     else:
         geometry_coords = np.array(geometry_pts)
         max_y = geometry_coords[:, 1].max()
@@ -83,67 +82,58 @@ def _prepare_geometry_for_transform(geometry_pts: CoordList, has_3d: bool = Fals
     return geometry
 
 
-def _project_to_yz_plane_front_view(points_3d):
-    """Project 3D coordinates to YZ plane front view"""
-    yz_coords = points_3d[:, [1, 2]]
-    front_view_coords = yz_coords.copy()
-    front_view_coords[:, 0] = -front_view_coords[:, 0]
-    return front_view_coords
+def _project_facade_to_2d(points_3d: np.ndarray) -> np.ndarray:
+    """
+    Projects 3D points to the facade plane (either XZ or YZ),
+    applies a necessary orientation flip for YZ cases, and normalizes
+    them to a (0,0) origin.
+    """
+    x_range = np.max(points_3d[:, 0]) - np.min(points_3d[:, 0])
+    y_range = np.max(points_3d[:, 1]) - np.min(points_3d[:, 1])
 
-def _normalize_coordinates_from_origin(coords_2d):
-    """Transform coordinates with bottom-left vertex as origin (0,0)"""
-    transformed_coords = coords_2d.copy()
+    if x_range >= y_range:
+        logger.info("Projecting to XZ plane (front/back view).")
+        facade_coords = points_3d[:, [0, 2]]
+    else:
+        logger.info("Projecting to YZ plane (side view).")
+        facade_coords = points_3d[:, [1, 2]]
+        facade_coords[:, 0] = -facade_coords[:, 0]
+
+    min_vals = np.min(facade_coords, axis=0)
+    normalized_coords = facade_coords - min_vals
     
-    x_min = coords_2d[:, 0].min()
-    y_min = coords_2d[:, 1].min()
-    
-    transformed_coords[:, 0] = coords_2d[:, 0] - x_min
-    transformed_coords[:, 1] = coords_2d[:, 1] - y_min
-    
-    return transformed_coords, (x_min, y_min)
+    return normalized_coords
 
 
-def _normalize_geometry_rect(rectangle_points, image_width, image_height, margin=100):
-    """Normalize geometry rectangle to fit within specified image size"""
-    if not rectangle_points:
-        return []
-    
-    unique_points = []
-    for point in rectangle_points:
-        if not unique_points or point != unique_points[0]:
-            unique_points.append(point)
-    
-    if len(unique_points) < 4:
-        return []
-    
-    x_coords = [point[0] for point in unique_points]
-    y_coords = [point[1] for point in unique_points]
-    
-    min_x, max_x = min(x_coords), max(x_coords)
-    min_y, max_y = min(y_coords), max(y_coords)
-    
-    geometry_width = max_x - min_x
-    geometry_height = max_y - min_y
-    
+def _normalize_geometry_rect(rectangle_points: RectangleCorners, image_width: int, image_height: int, margin: int = 100) -> RectangleCorners:
+    """
+    Normalize a 4-point rectangle to fit within a specified image size.
+    Assumes `rectangle_points` contains exactly 4 valid corner points.
+    """
+    if len(rectangle_points) != 4:
+        raise ValueError(f"Expected 4 corner points for normalization, but got {len(rectangle_points)}")
+
+    points_arr = np.array(rectangle_points, dtype=np.float32)
+    x_coords, y_coords = points_arr[:, 0], points_arr[:, 1]
+    min_x, max_x = np.min(x_coords), np.max(x_coords)
+    min_y, max_y = np.min(y_coords), np.max(y_coords)
+    geometry_width, geometry_height = max_x - min_x, max_y - min_y
+
     effective_width = image_width - 2 * margin
     effective_height = image_height - 2 * margin
-    
-    scale_x = effective_width / geometry_width if geometry_width != 0 else 1
-    scale_y = effective_height / geometry_height if geometry_height != 0 else 1
-    
-    scale = min(scale_x, scale_y)
-    
-    normalized_rect = []
-    for point in unique_points:
-        norm_x = (point[0] - min_x) * scale
-        norm_y = (point[1] - min_y) * scale
-        
-        final_x = norm_x + margin + (effective_width - geometry_width * scale) / 2
-        final_y = norm_y + margin + (effective_height - geometry_height * scale) / 2
-        
-        normalized_rect.append([final_x, final_y])
 
-    return normalized_rect
+    if geometry_width <= 0 or geometry_height <= 0:
+        logger.warning(f"Invalid geometry dimensions (width={geometry_width}, height={geometry_height}). Returning default rectangle.")
+        return [[margin, margin], [image_width - margin, margin], [image_width - margin, image_height - margin], [margin, image_height - margin]]
+
+    scale = min(effective_width / geometry_width, effective_height / geometry_height)
+    offset_x = margin + (effective_width - geometry_width * scale) / 2
+    offset_y = margin + (effective_height - geometry_height * scale) / 2
+
+    return [
+        ((pt[0] - min_x) * scale + offset_x, (pt[1] - min_y) * scale + offset_y)
+        for pt in rectangle_points
+    ]
 
 
 def _validate_corner_count(corners: np.ndarray) -> np.ndarray:
@@ -176,14 +166,30 @@ def _extract_rectangle_corners(points) -> np.ndarray:
     """Create rectangle using advanced corner detection algorithm."""
     unique_points = []
     for point in points:
-        if not unique_points or point != unique_points[0]:
-            unique_points.append(point)
+        is_duplicate = any(np.allclose(point, up) for up in unique_points)
+        if not is_duplicate:
+             unique_points.append(point)
     
     if len(unique_points) < 4:
         raise ValueError("Need at least 4 unique points for rectangle creation")
     
-    corners = _detect_optimal_corners(np.array(unique_points))
+    points_arr = np.array(unique_points, dtype=np.float32)
+
+    if _is_concave(points_arr):
+        logger.info("Concave polygon detected. Using convex hull for corner detection.")
+        hull = cv2.convexHull(points_arr.reshape(-1, 1, 2), returnPoints=True)
+        corners = _detect_optimal_corners(hull.squeeze(axis=1))
+    else:
+        corners = _detect_optimal_corners(points_arr)
+
     return corners
+
+def _is_concave(points: np.ndarray) -> bool:
+    """Check if a polygon is concave."""
+    if len(points) <= 3:
+        return False
+    hull = cv2.convexHull(points.reshape(-1, 1, 2), returnPoints=True)
+    return len(hull) < len(points)
 
 def _extract_basic_rectangle_corners(points) -> np.ndarray:
     """Create rectangle using basic corner detection algorithm."""
@@ -296,16 +302,18 @@ def _score_corner_quality(quality_metrics: dict) -> float:
     return score
 
 def _sort_corners(corners: np.ndarray) -> np.ndarray:
-    """Orders 4 corners: top-left, top-right, bottom-right, bottom-left"""
-    coord_sum = corners.sum(axis=1)
-    tl = corners[np.argmin(coord_sum)]
-    br = corners[np.argmax(coord_sum)]
+    """
+    Orders 4 corners in a consistent clockwise direction, starting from
+    the one closest to the top-left of the image's bounding box.
+    """
+    center = corners.mean(axis=0)
     
-    coord_diff = np.diff(corners, axis=1).flatten()
-    tr = corners[np.argmin(coord_diff)]
-    bl = corners[np.argmax(coord_diff)]
+    angles = np.arctan2(corners[:, 1] - center[1], corners[:, 0] - center[0])
     
-    return np.array([tl, tr, br, bl], dtype=np.float32)
+    sorted_indices = np.argsort(angles)
+    corners = corners[sorted_indices]
+
+    return np.array(list(corners), dtype=np.float32)
 
 def _remove_collinear_points(points: np.ndarray, min_distance: float = 1.0) -> np.ndarray:
     """Remove collinear points using perpendicular distance threshold"""
