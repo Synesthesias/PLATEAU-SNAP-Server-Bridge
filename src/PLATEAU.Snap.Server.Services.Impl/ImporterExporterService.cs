@@ -199,16 +199,26 @@ internal class ImporterExporterService : IImporterExporterService
             }
 
             var zipFilePath = Path.ChangeExtension(tempDirectory, $"{meshCode}.zip");
-            ZipFile.CreateFromDirectory(outputDirectory, zipFilePath, CompressionLevel.Optimal, false);
-
-            var memoryStream = new MemoryStream();
-            using (var fileStream = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read))
+            try
             {
-                await fileStream.CopyToAsync(memoryStream);
-            }
-            memoryStream.Position = 0;
+                ZipFile.CreateFromDirectory(outputDirectory, zipFilePath, CompressionLevel.Optimal, false);
 
-            return memoryStream;
+                var memoryStream = new MemoryStream();
+                using (var fileStream = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read))
+                {
+                    await fileStream.CopyToAsync(memoryStream);
+                }
+                memoryStream.Position = 0;
+
+                return memoryStream;
+            }
+            finally
+            {
+                if (File.Exists(zipFilePath))
+                {
+                    File.Delete(zipFilePath);
+                }
+            }
         }
         finally
         {
