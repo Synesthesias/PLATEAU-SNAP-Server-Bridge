@@ -34,20 +34,28 @@ public class RequestResponseLoggingMiddleware
             context.Request.Path,
             requestBody);
 
-        var originalBodyStream = context.Response.Body;
-        using var responseBody = new MemoryStream();
-        context.Response.Body = responseBody;
+        string responseText = string.Empty;
+        if (context.Response.ContentType != "application/zip" && context.Response.ContentType != "application/octet-stream")
+        {
+            var originalBodyStream = context.Response.Body;
+            using var responseBody = new MemoryStream();
+            context.Response.Body = responseBody;
 
-        await next(context);
+            await next(context);
 
-        context.Response.Body.Seek(0, SeekOrigin.Begin);
-        var responseText = await new StreamReader(context.Response.Body).ReadToEndAsync();
-        context.Response.Body.Seek(0, SeekOrigin.Begin);
+            context.Response.Body.Seek(0, SeekOrigin.Begin);
+            responseText = await new StreamReader(context.Response.Body).ReadToEndAsync();
+            context.Response.Body.Seek(0, SeekOrigin.Begin);
+
+            await responseBody.CopyToAsync(originalBodyStream);
+        }
+        else
+        {
+            responseText = "<binary data>";
+        }
 
         logger.LogInformation("Response {statusCode}: {body}",
             context.Response.StatusCode,
             responseText);
-
-        await responseBody.CopyToAsync(originalBodyStream);
     }
 }

@@ -14,11 +14,13 @@ public interface IImageRepository
 
     Task<bool> FaceExists(int surfaceGeometryId);
 
-    Task<int> CountSurfaceData(int texImageId);
+    Task<int> CountTextureparam(int texImageId);
 
-    Task UpdateTextureparamAsync(Textureparam textureparam, bool isAppearancesModified);
+    Task UpdateTextureparamAsync(Textureparam textureparam);
 
     Task AddTextureparamAsync(Textureparam textureparam);
+
+    Task AddSurfaceData(SurfaceDatum surfaceData, Textureparam textureparam);
 
     Task<Objectclass?> GetObjectClass(string classname);
 

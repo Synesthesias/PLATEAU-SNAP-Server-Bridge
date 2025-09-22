@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using PLATEAU.Snap.Models.Exceptions;
 using PLATEAU.Snap.Server.Entities;
@@ -82,20 +83,17 @@ internal class ImageRepository : BaseRepository, IImageRepository
             .AnyAsync(x => x.Id == surfaceGeometryId);
     }
 
-    public async Task<int> CountSurfaceData(int texImageId)
+    public async Task<int> CountTextureparam(int texImageId)
     {
-        return await Context.SurfaceData
-            .Where(x => x.TexImageId == texImageId)
+        return await Context.Textureparams
+            .Where(x => x.SurfaceData.TexImageId == texImageId && x.IsTextureParametrization == 1)
             .CountAsync();
     }
 
-    public async Task UpdateTextureparamAsync(Textureparam textureparam, bool isAppearancesModified)
+    public async Task UpdateTextureparamAsync(Textureparam textureparam)
     {
         Context.Textureparams.Update(textureparam);
-        if (!isAppearancesModified)
-        {
-            Context.Entry(textureparam.SurfaceData).Collection(x => x.Appearances).IsModified = false;
-        }
+        Context.Entry(textureparam.SurfaceData).Collection(x => x.Appearances).IsModified = false;
         await Context.SaveChangesAsync();
     }
 
@@ -103,6 +101,34 @@ internal class ImageRepository : BaseRepository, IImageRepository
     {
         Context.Textureparams.Add(textureparam);
         await Context.SaveChangesAsync();
+    }
+
+    public async Task AddSurfaceData(SurfaceDatum surfaceData, Textureparam textureparam)
+    {
+        using var transaction = await Context.Database.BeginTransactionAsync();
+        try
+        {
+            Context.SurfaceData.Add(surfaceData);
+            await Context.SaveChangesAsync();
+
+            // EntityFrameworkによる削除→更新を避けるため、RawSQLで更新を行う
+            var connection = Context.Database.GetDbConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE textureparam SET surface_data_id = @newId WHERE surface_geometry_id = @surfaceGeometryId AND surface_data_id = @oldId AND is_texture_parametrization = 1";
+            command.Parameters.Add(new NpgsqlParameter<int>("@newId", surfaceData.Id));
+            command.Parameters.Add(new NpgsqlParameter<int>("@surfaceGeometryId", textureparam.SurfaceGeometryId));
+            command.Parameters.Add(new NpgsqlParameter<int>("@oldId", textureparam.SurfaceDataId));
+            command.Transaction = transaction.GetDbTransaction();
+
+            await command.ExecuteNonQueryAsync();
+
+            await transaction.CommitAsync();
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<Objectclass?> GetObjectClass(string classname)

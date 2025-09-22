@@ -171,21 +171,21 @@ internal class TextureService : ITextureService
             {
                 throw new InvalidOperationException("SurfaceData is null in Textureparam.");
             }
-            var count = await this.imageRepository.CountSurfaceData(textureparam.SurfaceData.TexImage.Id);
 
+            var count = await this.imageRepository.CountTextureparam(textureparam.SurfaceData.TexImage.Id);
             if (count == 1)
             {
-                // このTexImageに紐づくSurfaceDataが1つだけの場合は更新
+                // このTexImageに紐づくTextureparamが1つだけの場合は更新
                 await UpdateTexImageAsync(textureparam, textureCoordinates, mimeType, extension, fileBytes, payload.BuildingId);
             }
             else if (count > 1)
             {
-                // このTexImageに紐づくSurfaceDataが複数ある場合は新規追加
+                // このTexImageに紐づくTextureparamが複数ある場合は新規追加
                 await AddTexImageAsync(textureparam, textureCoordinates, mimeType, extension, fileBytes, payload.BuildingId);
             }
             else
             {
-                throw new InvalidOperationException("No SurfaceData found for the given TexImageId.");
+                throw new InvalidOperationException("Inconsistent state: No Textureparam found for the given TexImage.");
             }
         }
     }
@@ -311,20 +311,7 @@ internal class TextureService : ITextureService
             ? Path.ChangeExtension(textureparam.SurfaceData.TexImage.TexImageUri, extension)
             : $"tex_{textureparam.SurfaceData.TexImage.Id}{extension}";
 
-        var isAppearancesModified = false;
-        if (textureparam.SurfaceData.Appearances is null || textureparam.SurfaceData.Appearances.Count == 0)
-        {
-            var appearance = await this.imageRepository.GetAppearanceAsync(buildingId);
-            if (appearance is null)
-            {
-                throw new InvalidOperationException($"Building with ID {buildingId} does not exist.");
-            }
-
-            textureparam.SurfaceData.Appearances = new List<Appearance> { appearance };
-            isAppearancesModified = true;
-        }
-
-        await this.imageRepository.UpdateTextureparamAsync(textureparam, isAppearancesModified);
+        await this.imageRepository.UpdateTextureparamAsync(textureparam);
     }
 
     private async Task AddTexImageAsync(Textureparam textureparam, Polygon textureCoordinates, string mimeType, string extension, byte[] fileBytes, int buildingId)
@@ -348,7 +335,7 @@ internal class TextureService : ITextureService
             },
             Appearances = new List<Appearance> { appearance }
         };
-        textureparam.SurfaceData = surfaceData;
-        await this.imageRepository.UpdateTextureparamAsync(textureparam, true);
+
+        await this.imageRepository.AddSurfaceData(surfaceData, textureparam);
     }
 }
