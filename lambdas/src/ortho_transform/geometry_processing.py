@@ -37,29 +37,21 @@ def parse_wkt_polygon(wkt_string: str) -> CoordList:
     coords = list(polygon.exterior.coords)
     return coords[:-1]  # Remove duplicate closing coordinate
 
-def _get_real_world_dimensions(geometry_pts: CoordList) -> Tuple[float, float]:
+def _get_real_world_dimensions(plane_geometry_pts: CoordList) -> Tuple[float, float]:
     """
-    Calculate real-world dimensions from a list of geometry coordinates.
+    Calculate real-world dimensions from a list of **2D plane** geometry coordinates.
     Returns (width, height). Returns (0.0, 0.0) on failure.
     """
-    if not geometry_pts:
+    if not plane_geometry_pts:
         return 0.0, 0.0
 
     try:
-        coords = np.array(geometry_pts)
-        # 3D
-        if coords.shape[1] >= 3:
-            xs = coords[:, 0]
-            zs = coords[:, 2]
-            width, height = np.max(xs) - np.min(xs), np.max(zs) - np.min(zs)
-            logger.debug(f"Using 3D geometry for dimensions: {width:.2f}x{height:.2f}")
-        # 2d fallback
-        else:
-            xs = coords[:, 0]
-            ys = coords[:, 1]
-            width, height = np.max(xs) - np.min(xs), np.max(ys) - np.min(ys)
-            logger.debug(f"Using 2D geometry for dimensions: {width:.2f}x{height:.2f}")
-        
+        coords = np.array(plane_geometry_pts)
+        xs = coords[:, 0]
+        ys = coords[:, 1]
+        width, height = np.max(xs) - np.min(xs), np.max(ys) - np.min(ys)
+        logger.debug(f"Using 2D geometry for dimensions: {width:.2f}x{height:.2f}")
+
         return (width, height) if width > 0 and height > 0 else (0.0, 0.0)
 
     except (IndexError, TypeError) as e:
@@ -84,24 +76,97 @@ def _prepare_geometry_for_transform(geometry_pts: CoordList, has_3d: bool = Fals
 
 def _project_facade_to_2d(points_3d: np.ndarray) -> np.ndarray:
     """
-    Projects 3D points to the facade plane (either XZ or YZ),
-    applies a necessary orientation flip for YZ cases, and normalizes
-    them to a (0,0) origin.
+    Projects 3D points to the best-fitting facade plane using PCA,
+    and normalizes them to a (0,0) origin.
+    Uses Z-axis (height) to determine proper orientation.
     """
-    x_range = np.max(points_3d[:, 0]) - np.min(points_3d[:, 0])
-    y_range = np.max(points_3d[:, 1]) - np.min(points_3d[:, 1])
-
-    if x_range >= y_range:
-        logger.info("Projecting to XZ plane (front/back view).")
+    if len(points_3d) < 3:
+        logger.warning(
+            "Need at least 3 points to define a plane. Using XZ projection as fallback."
+        )
         facade_coords = points_3d[:, [0, 2]]
-    else:
-        logger.info("Projecting to YZ plane (side view).")
-        facade_coords = points_3d[:, [1, 2]]
-        facade_coords[:, 0] = -facade_coords[:, 0]
+        min_vals = np.min(facade_coords, axis=0)
+        return facade_coords - min_vals
 
-    min_vals = np.min(facade_coords, axis=0)
-    normalized_coords = facade_coords - min_vals
-    
+    # Calculate the centroid and center the points
+    centroid = np.mean(points_3d, axis=0)
+    centered_points = points_3d - centroid
+    logger.debug(f"Original points shape: {points_3d.shape}, centroid: {centroid}")
+
+    # Analyze Z variation (height)
+    z_coords = points_3d[:, 2]
+    z_min, z_max = np.min(z_coords), np.max(z_coords)
+    height_variation = z_max - z_min
+    logger.debug(
+        f"Z-axis range: [{z_min:.2f}, {z_max:.2f}], height variation: {height_variation:.2f}"
+    )
+
+    # PCA
+    covariance_matrix = np.cov(centered_points.T)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+    sorted_indices = np.argsort(eigenvalues)[::-1]
+    sorted_eigenvalues = eigenvalues[sorted_indices]
+    sorted_eigenvectors = eigenvectors[:, sorted_indices]
+
+    # Plane normal is the smallest eigenvector
+    plane_normal = sorted_eigenvectors[:, 2]
+    logger.debug(f"Eigenvalues (desc): {sorted_eigenvalues}")
+    logger.debug(f"Plane normal: {plane_normal}")
+
+    # Decide facade type
+    vertical_component = abs(plane_normal[2])  # Z component
+    is_vertical_facade = height_variation > 1.0 and vertical_component < 0.7
+
+    if is_vertical_facade:
+        # Vertical facade: horizontal axis from primary component projected to XY,
+        # vertical axis aligned with world Z.
+        primary_component = sorted_eigenvectors[:, 0]
+        horizontal_component = np.array([primary_component[0], primary_component[1], 0])
+
+        if np.linalg.norm(horizontal_component) < 1e-6:
+            horizontal_component = np.array([1, 0, 0])
+        else:
+            horizontal_component = horizontal_component / np.linalg.norm(
+                horizontal_component
+            )
+
+        u = horizontal_component                    # horizontal
+        v = np.array([0, 0, 1])                     # vertical (world Z)
+    else:
+        # Horizontal surface: use top two principal components
+        u = sorted_eigenvectors[:, 0]
+        v = sorted_eigenvectors[:, 1]
+
+    # Orthonormalize
+    u = u / np.linalg.norm(u)
+    v = v / np.linalg.norm(v)
+
+    if is_vertical_facade:
+        # Ensure v ⟂ u
+        v = v - np.dot(v, u) * u
+        v = v / np.linalg.norm(v)
+    else:
+        # Ensure right-handed system for horizontal surfaces
+        cross_product = np.cross(u, v)
+        if np.dot(cross_product, plane_normal) < 0:
+            u = -u
+
+    facade_type = "vertical" if is_vertical_facade else "horizontal"
+    logger.info(f"Facade type: {facade_type}, height variation: {height_variation:.2f}")
+    logger.info(f"Projecting to facade plane with normal: {plane_normal}")
+    logger.debug(f"Final basis vectors - u (horizontal): {u}, v (vertical): {v}")
+
+    # Project to 2D and normalize to (0,0)
+    projected_2d = np.column_stack(
+        [np.dot(centered_points, u), np.dot(centered_points, v)]
+    )
+    min_vals = np.min(projected_2d, axis=0)
+    normalized_coords = projected_2d - min_vals
+
+    final_width = np.max(normalized_coords[:, 0])
+    final_height = np.max(normalized_coords[:, 1])
+    logger.debug(f"Final normalized dimensions: {final_width:.2f} x {final_height:.2f}")
+
     return normalized_coords
 
 
@@ -119,16 +184,24 @@ def _normalize_geometry_rect(rectangle_points: RectangleCorners, image_width: in
     min_y, max_y = np.min(y_coords), np.max(y_coords)
     geometry_width, geometry_height = max_x - min_x, max_y - min_y
 
-    effective_width = image_width - 2 * margin
-    effective_height = image_height - 2 * margin
+    # protect against collapsed area
+    MIN_EFFECTIVE = 32
+    eff_w = image_width - 2 * margin
+    eff_h = image_height - 2 * margin
+    if eff_w < MIN_EFFECTIVE or eff_h < MIN_EFFECTIVE:
+        max_margin_w = (image_width  - MIN_EFFECTIVE) // 2
+        max_margin_h = (image_height - MIN_EFFECTIVE) // 2
+        margin = max(0, min(margin, max_margin_w, max_margin_h))
+        eff_w = image_width - 2 * margin
+        eff_h = image_height - 2 * margin
 
     if geometry_width <= 0 or geometry_height <= 0:
         logger.warning(f"Invalid geometry dimensions (width={geometry_width}, height={geometry_height}). Returning default rectangle.")
         return [[margin, margin], [image_width - margin, margin], [image_width - margin, image_height - margin], [margin, image_height - margin]]
 
-    scale = min(effective_width / geometry_width, effective_height / geometry_height)
-    offset_x = margin + (effective_width - geometry_width * scale) / 2
-    offset_y = margin + (effective_height - geometry_height * scale) / 2
+    scale = min(eff_w / geometry_width, eff_h / geometry_height)
+    offset_x = margin + (eff_w - geometry_width * scale) / 2
+    offset_y = margin + (eff_h - geometry_height * scale) / 2
 
     return [
         ((pt[0] - min_x) * scale + offset_x, (pt[1] - min_y) * scale + offset_y)
@@ -274,7 +347,7 @@ def _assess_corner_quality(points: FloatArray, corners: FloatArray) -> QualityMe
 
 def _score_corner_quality(quality_metrics: dict) -> float:
     """Score corner detection quality. Higher score = better."""
-    if (quality_metrics['min_side_length'] < 10 or 
+    if (quality_metrics['min_side_length'] < 10 or
         quality_metrics['side_ratio'] == float('inf') or
         quality_metrics['max_corner_distance'] > 100):
         return -1000
@@ -452,3 +525,26 @@ def _detect_optimal_corners(points: np.ndarray) -> np.ndarray:
     logger.debug(f"Best method: {best_method} (score: {best_score:.1f})")
     return best_corners
 
+def _find_corner_indexes_basic(points: np.ndarray) -> np.ndarray:
+    """Return indexes of TL, TR, BR, BL using min/max coordinate anchors."""
+    x_min, y_min = points.min(axis=0)
+    x_max, y_max = points.max(axis=0)
+    dists_tl = np.sum((points - (x_min, y_min)) ** 2, axis=1)
+    dists_tr = np.sum((points - (x_max, y_min)) ** 2, axis=1)
+    dists_br = np.sum((points - (x_max, y_max)) ** 2, axis=1)
+    dists_bl = np.sum((points - (x_min, y_max)) ** 2, axis=1)
+    tl = np.argmin(dists_tl)
+    tr = np.argmin(dists_tr)
+    br = np.argmin(dists_br)
+    bl = np.argmin(dists_bl)
+    return np.array([tl, tr, br, bl], dtype=np.int32)
+
+def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
+    """Pearson corr; returns 0 if either is (near) constant to avoid NaNs."""
+    a = np.asarray(a, dtype=np.float32).ravel()
+    b = np.asarray(b, dtype=np.float32).ravel()
+    if a.size != b.size or a.size < 2:
+        return 0.0
+    if a.std() < 1e-6 or b.std() < 1e-6:
+        return 0.0
+    return float(np.corrcoef(a, b)[0, 1])

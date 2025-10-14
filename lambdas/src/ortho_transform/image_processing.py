@@ -7,14 +7,16 @@ import cv2
 from ..shared.decorators import ApiError
 from .geometry_processing import ImageArray, CoordList, Dimensions, BoundingBox
 from .geometry_processing import (
-    _prepare_geometry_for_transform, _extract_rectangle_corners,
-    _extract_basic_rectangle_corners, _normalize_geometry_rect,
+    _prepare_geometry_for_transform,
+    _detect_optimal_corners, _sort_corners,
+    _normalize_geometry_rect, _find_corner_indexes_basic,
+    _safe_corr,
     _transform_points, _get_real_world_dimensions
 )
 
 
-BUFFER_PIXELS: Final[int] = int(environ.get("BUFFER_PIXELS", "100"))
-MAX_DIMENSION: Final[int] = 2048 # this should be ok, but we might need actual memory estimation
+BUFFER_PIXELS: Final[int] = int(environ.get("BUFFER_PIXELS", "200"))
+MAX_DIMENSION: Final[int] = 2048
 MIN_CONTENT_SIZE = 50
 DEFAULT_BLACK_THRESHOLD = 10
 
@@ -22,10 +24,10 @@ from ..shared.logger import get_logger
 logger = get_logger(__name__)
 
 def process_building_extraction(
-    image: ImageArray, 
-    pts: CoordList, 
-    geometry_pts: CoordList, 
-    has_3d_geometry: bool = False, 
+    image: ImageArray,
+    pts: CoordList,
+    geometry_pts: CoordList,
+    has_3d_geometry: bool = False,
     buffer_pixels: int = 0
 ) -> Tuple[ImageArray, CoordList]:
     """Transform building image using perspective correction."""
@@ -36,36 +38,102 @@ def process_building_extraction(
     try:
         logger.info(f"Processing {len(pts)} coordinate points, 3D geometry: {has_3d_geometry}")
         coordinates = np.array(pts).tolist()
-        geometry = _prepare_geometry_for_transform(geometry_pts, has_3d_geometry)
-        
-        calculated_width, image_height = _compute_output_dimensions(geometry_pts, pts)
+        plane_geometry_pts = _prepare_geometry_for_transform(geometry_pts, has_3d_geometry)
+        logger.info(f"plane_geometry_pts: {plane_geometry_pts}")
+
+        #  safeguard (extreme outliers only)
+        src = np.array(coordinates, dtype=np.float32)
+        sx = float(src[:, 0].max() - src[:, 0].min()); sy = float(src[:, 1].max() - src[:, 1].min())
+        src_ar = (sx / sy) if sy > 0 else 1.0
+
+        gxy = np.array(plane_geometry_pts, dtype=np.float32)
+        gx = float(gxy[:, 0].max() - gxy[:, 0].min()); gy = float(gxy[:, 1].max() - gxy[:, 1].min())
+        geom_ar = (gx / gy) if gy > 0 else 1.0
+
+        AR_TOL = 2.5    # trigger when geometry is >2.5x thinner/wider than source
+        MIN_AR_ABS = 0.50   # absolute floor for geometry AR after scaling
+        MAX_X_SCALE = 12.0   # allow stronger correction than 3×
+
+        if geom_ar > 0 and (geom_ar < src_ar / AR_TOL or geom_ar < MIN_AR_ABS):
+            # a reasonable target AR: <= 1.0, close to source, but with a floor
+            desired_ar = max(MIN_AR_ABS, min(src_ar, 1.0))
+            k_needed   = desired_ar / geom_ar
+            k          = float(np.clip(k_needed, 1.0, MAX_X_SCALE))
+            if abs(k - 1.0) > 1e-6:
+                plane_geometry_pts = [(float(x) * k, float(y)) for (x, y) in plane_geometry_pts]
+                logger.warning(
+                    "Rescaled plane geometry X by %.3f (AR %.3f -> %.3f, target %.3f)",
+                    k, geom_ar, geom_ar * k, desired_ar
+                )
+        # end safeguard
+
+
+        calculated_width, image_height = _compute_output_dimensions(plane_geometry_pts, pts)
+
         margin = max(50, min(calculated_width, image_height) // 20)
         logger.info(f"Input: {image.shape[1]}x{image.shape[0]}px → Target: {calculated_width}x{image_height}px")
 
         # crop to roi
-        cropped_source_image, crop_offset_1 = _crop_source_to_polygon(image, coordinates, buffer_pixels)
-        
+        cropped_source_image, crop_offset_1 = _crop_source_to_polygon(
+            image, coordinates, buffer_pixels
+        )
+
         # original -> cropped
-        M_c1 = np.array([
-            [1, 0, -crop_offset_1[0]],
-            [0, 1, -crop_offset_1[1]],
-            [0, 0, 1]], dtype=np.float32)
+        M_c1 = np.array(
+            [[1, 0, -crop_offset_1[0]], [0, 1, -crop_offset_1[1]], [0, 0, 1]],
+            dtype=np.float32,
+        )
 
+        coordinates_in_cropped_space = [
+            (x - crop_offset_1[0], y - crop_offset_1[1]) for x, y in coordinates
+        ]
 
-        coordinates_in_cropped_space = [(x - crop_offset_1[0], y - crop_offset_1[1]) for x, y in coordinates]
-        source_corners = _extract_rectangle_corners(coordinates_in_cropped_space)
-        
-        dest_corners = _extract_basic_rectangle_corners(geometry)
-        normalized_dest = _normalize_geometry_rect(dest_corners.tolist(), calculated_width, image_height, margin=margin)
+        idx = _find_corner_indexes_basic(np.array(plane_geometry_pts, dtype=np.float32))
+        dest_corners = np.array([plane_geometry_pts[i] for i in idx], dtype=np.float32)
+        source_corners = np.array([coordinates_in_cropped_space[i] for i in idx], dtype=np.float32)
+
+        normalized_dest = _normalize_geometry_rect(
+            dest_corners.tolist(), calculated_width, image_height, margin=margin
+        )
+
+        if np.linalg.norm(dest_corners[0] - dest_corners[1]) < 1e-3 or \
+        np.linalg.norm(source_corners[0] - source_corners[1]) < 1e-3:
+            dest_corners = _sort_corners(_detect_optimal_corners(np.array(plane_geometry_pts, dtype=np.float32)))
+            source_corners = _sort_corners(_detect_optimal_corners(np.array(coordinates_in_cropped_space, dtype=np.float32)))
+            normalized_dest = _normalize_geometry_rect(
+                dest_corners.tolist(), calculated_width, image_height, margin=margin
+            )
 
         source_corners_np = source_corners.astype(np.float32)
         normalized_dest_np = np.array(normalized_dest, dtype=np.float32)
 
-        logger.info(f"Source corners shape: {source_corners_np.shape}, Dest corners shape: {normalized_dest_np.shape}")
-        
+        logger.info(
+            f"Source corners shape: {source_corners_np.shape}, Dest corners shape: {normalized_dest_np.shape}"
+        )
+
+        post_margin = int(buffer_pixels)
+
+        # Create a larger canvas so the warped result has room for the buffered content
+        canvas_w = int(calculated_width + 2 * post_margin)
+        canvas_h = int(image_height    + 2 * post_margin)
+
+        # Shift the destination quad into the padded canvas by the margin
+        normalized_dest_np = np.array(normalized_dest, dtype=np.float32)
+        normalized_dest_np += np.array([post_margin, post_margin], dtype=np.float32)
+
+        corr_x = _safe_corr(source_corners_np[:, 0], normalized_dest_np[:, 0])
+        corr_y = _safe_corr(source_corners_np[:, 1], normalized_dest_np[:, 1])
+
+        if corr_x < 0:
+            normalized_dest_np[:, 0] = (canvas_w - 1) - normalized_dest_np[:, 0]
+        if corr_y < 0:
+            normalized_dest_np[:, 1] = (canvas_h - 1) - normalized_dest_np[:, 1]
+
+
         # cropped -> warped
         M_w = cv2.getPerspectiveTransform(source_corners_np, normalized_dest_np)
-        warped_image = cv2.warpPerspective(cropped_source_image, M_w, (calculated_width, image_height))
+        warped_image = cv2.warpPerspective(cropped_source_image, M_w, (canvas_w, canvas_h))
+
 
         content_bounds = _find_content_bounds(warped_image)
         
@@ -89,12 +157,14 @@ def process_building_extraction(
 
         crop_offset_2 = (final_crop_x_min, final_crop_y_min)
         # warped -> final
-        M_c2 = np.array([
-            [1, 0, -crop_offset_2[0]],
-            [0, 1, -crop_offset_2[1]],
-            [0, 0, 1]], dtype=np.float32)
+        M_c2 = np.array(
+            [[1, 0, -crop_offset_2[0]], [0, 1, -crop_offset_2[1]], [0, 0, 1]],
+            dtype=np.float32,
+        )
 
-        final_image = warped_image[final_crop_y_min:final_crop_y_max, final_crop_x_min:final_crop_x_max]
+        final_image = warped_image[
+            final_crop_y_min:final_crop_y_max, final_crop_x_min:final_crop_x_max
+        ]
         M_final = M_c2 @ M_w @ M_c1
         final_points = _transform_points(pts, M_final)
 
