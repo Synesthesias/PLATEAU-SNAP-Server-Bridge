@@ -216,8 +216,19 @@ def fetch_tile(session: requests.Session, z: int, x: int, y: int) -> np.ndarray:
             resp.raise_for_status()
             img = cv2.imdecode(np.frombuffer(resp.content, np.uint8), cv2.IMREAD_COLOR)
             if img is None:
-                raise ValueError("decode fail")
+                logger.error("Tile %d/%d/%d decode fail; substituting blank tile", z, x, y)
+                return np.zeros((TILE_SIZE, TILE_SIZE, 3), dtype=np.uint8)
+
+            if img.shape[0] != TILE_SIZE or img.shape[1] != TILE_SIZE:
+                try:
+                    img = cv2.resize(img, (TILE_SIZE, TILE_SIZE), interpolation=cv2.INTER_AREA)
+                except Exception as e:
+                    logger.error("Tile %d/%d/%d resize fail (%s); substituting blank tile", z, x, y, e)
+                    return np.zeros((TILE_SIZE, TILE_SIZE, 3), dtype=np.uint8)
+
             return img
-    except Exception as exc:
-        logger.error("Tile %d/%d/%d fetch error: %s", z, x, y, exc)
-        raise
+
+    except requests.RequestException as exc:
+        logger.error("Tile %d/%d/%d HTTP error: %s; substituting blank tile", z, x, y, exc)
+        return np.zeros((TILE_SIZE, TILE_SIZE, 3), dtype=np.uint8)
+    
