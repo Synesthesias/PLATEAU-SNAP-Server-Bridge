@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.17"
     }
     random = {
       source  = "hashicorp/random"
@@ -21,5 +21,6 @@ terraform {
 }
 
 provider "aws" {
-  region = local.aws.region
+  region  = local.aws.region
+  # profile = "<AWS CLI profile name>"
 }

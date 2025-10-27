@@ -105,6 +105,7 @@ data "aws_iam_policy_document" "allow_ecr_push" {
     ]
     resources = [
       "arn:aws:ecr:${local.aws.region}:${data.aws_caller_identity.current.account_id}:repository/${local.app_name}",
+      "arn:aws:ecr:${local.aws.region}:${data.aws_caller_identity.current.account_id}:repository/${local.app_name}-cms",
       "arn:aws:ecr:${local.aws.region}:${data.aws_caller_identity.current.account_id}:repository/export-lambda",
     ]
   }

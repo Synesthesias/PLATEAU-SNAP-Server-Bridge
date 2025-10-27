@@ -1,12 +1,13 @@
 locals {
   aws = {
-    region = "ap-northeast-1"
+    region  = "ap-northeast-1"
     # profile = "<AWS CLI profile name>"
   }
 
   app_name_prefix = "plateausnap"
   stage           = "dev"
   cidr_prefix     = "10.0"
+  domain          = "<Your domain name (e.g. example.com)>"
 
   iam = {
     group_name = "snap-dev-group"

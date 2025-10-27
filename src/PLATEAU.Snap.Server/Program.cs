@@ -1,7 +1,5 @@
 using Amazon.S3;
 using Amazon.S3.Model;
-using Amazon.SecretsManager;
-using Amazon.SecretsManager.Model;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -26,16 +24,7 @@ var isDevelopment = builder.Environment.IsDevelopment();
 
 // Configuration
 var configuration = builder.Configuration;
-if (!isDevelopment)
-{
-    var secretName = Environment.GetEnvironmentVariable("SECRET_NAME");
-    ArgumentNullException.ThrowIfNull(secretName);
-
-    var response = await new AmazonSecretsManagerClient().GetSecretValueAsync(new GetSecretValueRequest() { SecretId = secretName });
-    var dic = JsonSerializer.Deserialize<Dictionary<string, string?>>(response.SecretString);
-    configuration.AddInMemoryCollection(dic);
-}
-else
+if (isDevelopment)
 {
     var awsOptions = configuration.GetAWSOptions();
     Console.WriteLine($"Profile: {awsOptions.Profile}, Region: {awsOptions.Region.DisplayName}");
@@ -82,6 +71,8 @@ var logfilePath = builder.Configuration.GetValue<string>("LogFilePath");
 var logLevel = builder.Configuration.GetValue<string>("LogLevel") ?? "Information";
 var enableRequestResponseLogging = builder.Configuration.GetValue<bool>("EnableRequestResponseLogging");
 var logEventLevel = Enum.TryParse(logLevel, true, out LogEventLevel level) ? level : LogEventLevel.Information;
+
+Console.OutputEncoding = System.Text.Encoding.UTF8;
 var loggerConfiguration = new LoggerConfiguration()
     .MinimumLevel.Debug()
     .Enrich.FromLogContext()
@@ -96,7 +87,8 @@ if (!string.IsNullOrEmpty(logfilePath))
         retainedFileCountLimit: 3,
         rollOnFileSizeLimit: true,
         shared: true,
-        flushToDiskInterval: TimeSpan.FromSeconds(1)
+        flushToDiskInterval: TimeSpan.FromSeconds(1),
+        encoding: System.Text.Encoding.UTF8
     );
 }
 Log.Logger = loggerConfiguration.CreateLogger();

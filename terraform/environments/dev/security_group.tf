@@ -78,6 +78,33 @@ resource "aws_security_group" "lambda_rds" {
   }
 }
 
+resource "aws_security_group" "alb" {
+  name        = "${local.app_name}-alb-sg"
+  description = "${local.app_name} alb rule based routing"
+  vpc_id      = aws_vpc.default.id
+  tags = {
+    Name = "${local.app_name}-alb-sg"
+  }
+}
+
+resource "aws_security_group" "ecs" {
+  name        = "${local.app_name}-ecs-sg"
+  description = "Security Group for ECS"
+  vpc_id      = aws_vpc.default.id
+  tags = {
+    Name = "${local.app_name}-ecs-sg"
+  }
+}
+
+resource "aws_security_group" "vpc_endpoints" {
+  name        = "${local.app_name}-vpc-endpoints-sg"
+  description = "Security Group for VPC Endpoints"
+  vpc_id      = aws_vpc.default.id
+  tags = {
+    Name = "${local.app_name}-vpc-endpoints-sg"
+  }
+}
+
 data "aws_prefix_list" "s3" {
   name = "com.amazonaws.${local.aws.region}.s3"
 }
@@ -152,4 +179,142 @@ resource "aws_security_group_rule" "lambda_rds_out_any" {
   from_port         = 0
   to_port           = 0
   cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "alb_http" {
+  from_port         = 80
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb.id
+  to_port           = 80
+  type              = "ingress"
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "alb_https" {
+  from_port         = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb.id
+  to_port           = 443
+  type              = "ingress"
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+# ALB to ECS communication (API on port 8080)
+resource "aws_security_group_rule" "alb_to_ecs_api" {
+  from_port                = 8080
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.alb.id
+  to_port                  = 8080
+  type                     = "egress"
+  source_security_group_id = aws_security_group.ecs.id
+}
+
+# ALB to ECS communication (CMS on port 3000)
+resource "aws_security_group_rule" "alb_to_ecs_cms" {
+  from_port                = 3000
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.alb.id
+  to_port                  = 3000
+  type                     = "egress"
+  source_security_group_id = aws_security_group.ecs.id
+}
+
+# ECS from ALB (API on port 8080)
+resource "aws_security_group_rule" "ecs_from_alb_api" {
+  from_port                = 8080
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ecs.id
+  to_port                  = 8080
+  type                     = "ingress"
+  source_security_group_id = aws_security_group.alb.id
+}
+
+# ECS from ALB (CMS on port 3000)
+resource "aws_security_group_rule" "ecs_from_alb_cms" {
+  from_port                = 3000
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ecs.id
+  to_port                  = 3000
+  type                     = "ingress"
+  source_security_group_id = aws_security_group.alb.id
+}
+
+# ECS outbound for internet access (ECR, CloudWatch, etc.)
+resource "aws_security_group_rule" "ecs_egress" {
+  from_port         = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.ecs.id
+  to_port           = 0
+  type              = "egress"
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+# ECS to RDS
+resource "aws_security_group_rule" "ecs_to_rds" {
+  from_port                = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ecs.id
+  to_port                  = 5432
+  type                     = "egress"
+  source_security_group_id = aws_security_group.rds.id
+}
+
+# RDS from ECS
+resource "aws_security_group_rule" "rds_from_ecs" {
+  from_port                = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.rds.id
+  to_port                  = 5432
+  type                     = "ingress"
+  source_security_group_id = aws_security_group.ecs.id
+}
+
+# VPC Endpoints - ingress from ECS for HTTPS
+resource "aws_security_group_rule" "vpc_endpoints_from_ecs" {
+  from_port                = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.vpc_endpoints.id
+  to_port                  = 443
+  type                     = "ingress"
+  source_security_group_id = aws_security_group.ecs.id
+}
+
+# ECS to VPC Endpoints for HTTPS
+resource "aws_security_group_rule" "ecs_to_vpc_endpoints" {
+  from_port                = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ecs.id
+  to_port                  = 443
+  type                     = "egress"
+  source_security_group_id = aws_security_group.vpc_endpoints.id
+}
+
+# Lambda RDS to VPC Endpoints for HTTPS (Secrets Manager access)
+resource "aws_security_group_rule" "lambda_rds_to_vpc_endpoints" {
+  from_port                = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.lambda_rds.id
+  to_port                  = 443
+  type                     = "egress"
+  source_security_group_id = aws_security_group.vpc_endpoints.id
+}
+
+# VPC Endpoints - ingress from Lambda RDS
+resource "aws_security_group_rule" "vpc_endpoints_from_lambda_rds" {
+  from_port                = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.vpc_endpoints.id
+  to_port                  = 443
+  type                     = "ingress"
+  source_security_group_id = aws_security_group.lambda_rds.id
+}
+
+# VPC Endpoints - ingress from Lambda S3-only
+resource "aws_security_group_rule" "vpc_endpoints_from_lambda_s3" {
+  from_port                = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.vpc_endpoints.id
+  to_port                  = 443
+  type                     = "ingress"
+  source_security_group_id = aws_security_group.lambda_sg_s3_only.id
 }

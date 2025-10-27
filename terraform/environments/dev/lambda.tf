@@ -68,7 +68,7 @@ resource "aws_lambda_function" "geo_lambdas" {
   }
 
   vpc_config {
-    subnet_ids = [aws_subnet.private_1a.id]
+    subnet_ids = [aws_subnet.private_1a.id, aws_subnet.private_1c.id]
     security_group_ids = [
       each.value.needs_internet_access ? aws_security_group.lambda_sg_internet_access.id : aws_security_group.lambda_sg_s3_only.id
     ]
@@ -150,13 +150,20 @@ data "aws_ecr_image" "export_lambda_image" {
   most_recent     = true
 }
 
+resource "aws_cloudwatch_log_group" "export_lambda_logs" {
+  for_each          = local.export_functions
+  name              = "/aws/lambda/${each.key}"
+  retention_in_days = 30
+}
+
+
 resource "aws_lambda_function" "export_lambdas" {
   for_each = local.export_functions
 
   function_name = each.key
   architectures = ["x86_64"]
   role          = aws_iam_role.lambda_exec_role.arn
-  depends_on    = [aws_cloudwatch_log_group.lambda_logs] # logs must exist before lambda deployment
+  depends_on    = [aws_cloudwatch_log_group.export_lambda_logs] # logs must exist before lambda deployment
 
   # Note: Docker image must be built with --provenance=false to avoid Lambda manifest compatibility issues
   package_type = "Image"
@@ -173,9 +180,8 @@ resource "aws_lambda_function" "export_lambdas" {
   }
 
   vpc_config {
-    subnet_ids = [aws_subnet.private_1a.id]
+    subnet_ids = [aws_subnet.private_1a.id, aws_subnet.private_1c.id]
     security_group_ids = [
-      aws_security_group.lambda_sg_s3_only.id,
       aws_security_group.lambda_rds.id
     ]
   }
@@ -185,9 +191,4 @@ resource "aws_lambda_function" "export_lambdas" {
       SECRET_NAME = aws_secretsmanager_secret.default.name
     }
   }
-}
-resource "aws_cloudwatch_log_group" "export_lambda_logs" {
-  for_each          = local.export_functions
-  name              = "/aws/lambda/${each.key}"
-  retention_in_days = 30
 }
