@@ -23,8 +23,8 @@ from shapely.geometry import Polygon
 from ..shared.response_formatters import _resp
 from ..shared.s3_utils import download_from_s3, upload_png_to_s3
 from ..shared.decorators import api_handler, ApiError
-from .geometry_processing import parse_wkt_polygon
-from .image_processing import process_building_extraction, BUFFER_PIXELS
+from .geometry_processing import wkt_polygon_to_coords
+from .image_processing import rectify_facade
 
 from ..shared.logger import get_logger
 logger = get_logger(__name__)
@@ -43,11 +43,10 @@ def lambda_handler(body, _context):
         raise ApiError(400, f"Missing required parameter(s): {', '.join(missing)}")
 
     img = download_from_s3(path)
-    coordinate_pts = parse_wkt_polygon(coordinates)
-    geometry_pts = parse_wkt_polygon(geometry)
-    has_3d = len(geometry_pts[0]) > 2 if geometry_pts else False
+    coordinate_pts = wkt_polygon_to_coords(coordinates)
+    geometry_pts = wkt_polygon_to_coords(geometry)
 
-    warped_img, warped_pts = process_building_extraction(img, coordinate_pts, geometry_pts, has_3d, BUFFER_PIXELS)
+    warped_img, warped_pts = rectify_facade(img, coordinate_pts, geometry_pts)
     default_bucket = urlparse(path).netloc
     bucket = environ.get("OUTPUT_S3_BUCKET", default_bucket)
     folder = datetime.now(timezone.utc).strftime("%Y-%m-%d")

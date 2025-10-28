@@ -1,186 +1,90 @@
 from os import environ
-from typing import Final, Tuple
+from typing import Final
 import numpy as np
 import cv2
 
 
 from ..shared.decorators import ApiError
-from .geometry_processing import ImageArray, CoordList, Dimensions, BoundingBox
+from .geometry_processing import CoordList, Dimensions
 from .geometry_processing import (
-    _prepare_geometry_for_transform,
-    _detect_optimal_corners, _sort_corners,
-    _normalize_geometry_rect, _find_corner_indexes_basic,
+    _geometry_to_y_down_plane_coords,
+    _index_corners_tl_tr_br_bl,
     _safe_corr,
-    _transform_points, _get_real_world_dimensions
+    _apply_homography_to_points, _compute_axis_aligned_size_2d
 )
 
 
 BUFFER_PIXELS: Final[int] = int(environ.get("BUFFER_PIXELS", "200"))
-MAX_DIMENSION: Final[int] = 2048
-MIN_CONTENT_SIZE = 50
-DEFAULT_BLACK_THRESHOLD = 10
+MAX_DIMENSION: Final[int] = 4096
 
 from ..shared.logger import get_logger
 logger = get_logger(__name__)
 
-def process_building_extraction(
-    image: ImageArray,
-    pts: CoordList,
-    geometry_pts: CoordList,
-    has_3d_geometry: bool = False,
-    buffer_pixels: int = 0
-) -> Tuple[ImageArray, CoordList]:
-    """Transform building image using perspective correction."""
-    if len(pts) < 3:
-        raise ApiError(400, "Need at least 3 coordinate points")
-    if buffer_pixels < 0:
-        raise ApiError(400, "Buffer pixels cannot be negative")
-    try:
-        logger.info(f"Processing {len(pts)} coordinate points, 3D geometry: {has_3d_geometry}")
-        coordinates = np.array(pts).tolist()
-        plane_geometry_pts = _prepare_geometry_for_transform(geometry_pts, has_3d_geometry)
-        logger.info(f"plane_geometry_pts: {plane_geometry_pts}")
+def rectify_facade(image, pts, geometry_pts, facade_buffer_px=BUFFER_PIXELS):
+    if len(pts) < 4 or len(geometry_pts) < 4:
+        logger.warning("rectify_facade: insufficient correspondences (pts=%d, geometry_pts=%d)", len(pts), len(geometry_pts))
+        raise ApiError(400, "Need ≥4 correspondences")
+    
+    logger.debug("rectify_facade: start (pts=%d, geometry_pts=%d, buffer=%d)",
+                 len(pts), len(geometry_pts), int(facade_buffer_px))
 
-        #  safeguard (extreme outliers only)
-        src = np.array(coordinates, dtype=np.float32)
-        sx = float(src[:, 0].max() - src[:, 0].min()); sy = float(src[:, 1].max() - src[:, 1].min())
-        src_ar = (sx / sy) if sy > 0 else 1.0
-
-        gxy = np.array(plane_geometry_pts, dtype=np.float32)
-        gx = float(gxy[:, 0].max() - gxy[:, 0].min()); gy = float(gxy[:, 1].max() - gxy[:, 1].min())
-        geom_ar = (gx / gy) if gy > 0 else 1.0
-
-        AR_TOL = 2.5    # trigger when geometry is >2.5x thinner/wider than source
-        MIN_AR_ABS = 0.50   # absolute floor for geometry AR after scaling
-        MAX_X_SCALE = 12.0   # allow stronger correction than 3×
-
-        if geom_ar > 0 and (geom_ar < src_ar / AR_TOL or geom_ar < MIN_AR_ABS):
-            # a reasonable target AR: <= 1.0, close to source, but with a floor
-            desired_ar = max(MIN_AR_ABS, min(src_ar, 1.0))
-            k_needed   = desired_ar / geom_ar
-            k          = float(np.clip(k_needed, 1.0, MAX_X_SCALE))
-            if abs(k - 1.0) > 1e-6:
-                plane_geometry_pts = [(float(x) * k, float(y)) for (x, y) in plane_geometry_pts]
-                logger.warning(
-                    "Rescaled plane geometry X by %.3f (AR %.3f -> %.3f, target %.3f)",
-                    k, geom_ar, geom_ar * k, desired_ar
-                )
-        # end safeguard
+    # Plane coords (Y-down to match image)
+    plane2d = np.asarray(_geometry_to_y_down_plane_coords(geometry_pts), np.float32)
+    img2d   = np.asarray(pts, np.float32)
 
 
-        calculated_width, image_height = _compute_output_dimensions(plane_geometry_pts, pts)
+    # Pick pairs (all if lengths match, else 4 corners in TL,TR,BR,BL)
+    use_all = (len(plane2d) == len(img2d) and len(plane2d) >= 6)
+    if use_all:
+        g2, i2 = plane2d, img2d
+    else:
+        idx4 = _index_corners_tl_tr_br_bl(plane2d)
+        g2, i2 = plane2d[idx4], img2d[idx4]
 
-        margin = max(50, min(calculated_width, image_height) // 20)
-        logger.info(f"Input: {image.shape[1]}x{image.shape[0]}px → Target: {calculated_width}x{image_height}px")
-
-        # crop to roi
-        cropped_source_image, crop_offset_1 = _crop_source_to_polygon(
-            image, coordinates, buffer_pixels
-        )
-
-        # original -> cropped
-        M_c1 = np.array(
-            [[1, 0, -crop_offset_1[0]], [0, 1, -crop_offset_1[1]], [0, 0, 1]],
-            dtype=np.float32,
-        )
-
-        coordinates_in_cropped_space = [
-            (x - crop_offset_1[0], y - crop_offset_1[1]) for x, y in coordinates
-        ]
-
-        idx = _find_corner_indexes_basic(np.array(plane_geometry_pts, dtype=np.float32))
-        dest_corners = np.array([plane_geometry_pts[i] for i in idx], dtype=np.float32)
-        source_corners = np.array([coordinates_in_cropped_space[i] for i in idx], dtype=np.float32)
-
-        normalized_dest = _normalize_geometry_rect(
-            dest_corners.tolist(), calculated_width, image_height, margin=margin
-        )
-
-        if np.linalg.norm(dest_corners[0] - dest_corners[1]) < 1e-3 or \
-        np.linalg.norm(source_corners[0] - source_corners[1]) < 1e-3:
-            dest_corners = _sort_corners(_detect_optimal_corners(np.array(plane_geometry_pts, dtype=np.float32)))
-            source_corners = _sort_corners(_detect_optimal_corners(np.array(coordinates_in_cropped_space, dtype=np.float32)))
-            normalized_dest = _normalize_geometry_rect(
-                dest_corners.tolist(), calculated_width, image_height, margin=margin
-            )
-
-        source_corners_np = source_corners.astype(np.float32)
-        normalized_dest_np = np.array(normalized_dest, dtype=np.float32)
-
-        logger.info(
-            f"Source corners shape: {source_corners_np.shape}, Dest corners shape: {normalized_dest_np.shape}"
-        )
-
-        post_margin = int(buffer_pixels)
-
-        # Create a larger canvas so the warped result has room for the buffered content
-        canvas_w = int(calculated_width + 2 * post_margin)
-        canvas_h = int(image_height    + 2 * post_margin)
-
-        # Shift the destination quad into the padded canvas by the margin
-        normalized_dest_np = np.array(normalized_dest, dtype=np.float32)
-        normalized_dest_np += np.array([post_margin, post_margin], dtype=np.float32)
-
-        corr_x = _safe_corr(source_corners_np[:, 0], normalized_dest_np[:, 0])
-        corr_y = _safe_corr(source_corners_np[:, 1], normalized_dest_np[:, 1])
-
-        if corr_x < 0:
-            normalized_dest_np[:, 0] = (canvas_w - 1) - normalized_dest_np[:, 0]
-        if corr_y < 0:
-            normalized_dest_np[:, 1] = (canvas_h - 1) - normalized_dest_np[:, 1]
+    # Homography plane→image
+    H_g2i, _ = cv2.findHomography(g2, i2, cv2.RANSAC, 13.0, maxIters=4000, confidence=0.999)
+    if H_g2i is None:
+        logger.error("rectify_facade: findHomography failed (pairs=%d)", len(g2))
+        raise ApiError(500, "findHomography failed")
 
 
-        # cropped -> warped
-        M_w = cv2.getPerspectiveTransform(source_corners_np, normalized_dest_np)
-        warped_image = cv2.warpPerspective(cropped_source_image, M_w, (canvas_w, canvas_h))
+    # Output size & margins
+    W, H = _compute_output_canvas_from_aspect_and_bbox_area(plane2d.tolist(), pts)
+    m = max(50, min(W, H)//20)
+    logger.debug("rectify_facade: output size W=%d H=%d margin=%d", W, H, m)
+
+    # Plane bbox (TL,TR,BR,BL), expanded by facade_buffer_px mapped into plane units
+    idx4_all = _index_corners_tl_tr_br_bl(plane2d)
+    P = plane2d[idx4_all].astype(np.float32)
+    pmin, pmax = P.min(0), P.max(0)
+    pw, ph = float(pmax[0]-pmin[0]), float(pmax[1]-pmin[1])
+    iw, ih = float(W-2*m), float(H-2*m)
+
+    if pw>1e-6 and ph>1e-6 and iw>1e-6 and ih>1e-6 and facade_buffer_px>0:
+        bx = min((facade_buffer_px*pw)/iw, 0.25*pw)
+        by = min((facade_buffer_px*ph)/ih, 0.25*ph)
+        pmin -= (bx, by); pmax += (bx, by)
+
+    P_exp = np.array([[pmin[0],pmin[1]],[pmax[0],pmin[1]],[pmax[0],pmax[1]],[pmin[0],pmax[1]]], np.float32)
+    D = np.array([[m,m],[W-m,m],[W-m,H-m],[m,H-m]], np.float32)
+
+    H_g2d = cv2.getPerspectiveTransform(P_exp, D)
+    H_i2d = H_g2d @ np.linalg.inv(H_g2i)
+    
+    H_i2d = _fix_axis_flips_by_src_dst_correlation(H_i2d, H_g2i, H_g2d, P_exp, W, H)
+
+    warped = cv2.warpPerspective(image, H_i2d, (W, H))
+    warped_pts = _apply_homography_to_points(pts, H_i2d)
+    logger.debug("rectify_facade: warp complete; transformed %d points", len(pts))
+    return warped, [(float(x), float(y)) for x,y in warped_pts]
 
 
-        content_bounds = _find_content_bounds(warped_image)
-        
-        M_orig_to_warped = M_w @ M_c1
-        pts_in_warped_space = _transform_points(pts, M_orig_to_warped)
-        
-        coords = np.array(pts_in_warped_space)
-        poly_x_min, poly_y_min = coords.min(axis=0)
-        poly_x_max, poly_y_max = coords.max(axis=0)
-
-        final_crop_x_min = max(content_bounds[0], int(poly_x_min - buffer_pixels))
-        final_crop_y_min = max(content_bounds[1], int(poly_y_min - buffer_pixels))
-        final_crop_x_max = min(content_bounds[2], int(poly_x_max + buffer_pixels))
-        final_crop_y_max = min(content_bounds[3], int(poly_y_max + buffer_pixels))
-        # Clamp
-        h, w = warped_image.shape[:2]
-        final_crop_x_min = max(0, final_crop_x_min)
-        final_crop_y_min = max(0, final_crop_y_min)
-        final_crop_x_max = min(w, final_crop_x_max)
-        final_crop_y_max = min(h, final_crop_y_max)
-
-        crop_offset_2 = (final_crop_x_min, final_crop_y_min)
-        # warped -> final
-        M_c2 = np.array(
-            [[1, 0, -crop_offset_2[0]], [0, 1, -crop_offset_2[1]], [0, 0, 1]],
-            dtype=np.float32,
-        )
-
-        final_image = warped_image[
-            final_crop_y_min:final_crop_y_max, final_crop_x_min:final_crop_x_max
-        ]
-        M_final = M_c2 @ M_w @ M_c1
-        final_points = _transform_points(pts, M_final)
-
-        return final_image, final_points
-        
-    except Exception as e:
-        logger.error(f"Building extraction failed: {e}")
-        raise ApiError(500, f"Transformation error: {str(e)}")
-
-
-def _compute_output_dimensions(geometry_pts: CoordList, coordinates_pts: CoordList) -> Dimensions:
+def _compute_output_canvas_from_aspect_and_bbox_area(geometry_pts: CoordList, coordinates_pts: CoordList) -> Dimensions:
     """
     Calculate output dimensions based on the target geometry's aspect ratio
     and the source polygon's pixel area.
     """
-    real_width, real_height = _get_real_world_dimensions(geometry_pts)
+    real_width, real_height = _compute_axis_aligned_size_2d(geometry_pts)
     if real_width <= 0 or real_height <= 0:
         logger.warning("Invalid real-world dimensions; falling back to a 1:1 aspect ratio.")
         target_aspect_ratio = 1.0
@@ -238,35 +142,29 @@ def _compute_output_dimensions(geometry_pts: CoordList, coordinates_pts: CoordLi
     return max(1, calculated_width), max(1, calculated_height)
 
 
-def _find_content_bounds(image: ImageArray, black_threshold: int = DEFAULT_BLACK_THRESHOLD) -> BoundingBox:
-    """Find the bounding box of non-black content in the image.
+def _fix_axis_flips_by_src_dst_correlation(H_i2d, H_g2i, H_g2d, plane_quad, W, H):
+    """Apply horizontal and vertical flip corrections if needed."""
+    src_x = (H_g2i @ np.column_stack([plane_quad, np.ones(4)]).T)
+    src_x = (src_x[0] / src_x[2]).ravel()
+    dst_x = (H_g2d @ np.column_stack([plane_quad, np.ones(4)]).T)
+    dst_x = (dst_x[0] / dst_x[2]).ravel()
     
-    Returns: (x_min, y_min, x_max, y_max) where x=column, y=row
-    """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    non_black = gray > black_threshold
-    rows = np.any(non_black, axis=1)
-    cols = np.any(non_black, axis=0)
-    
-    if not np.any(rows) or not np.any(cols):
-        return 0, 0, image.shape[1], image.shape[0]  # x_min, y_min, x_max, y_max
-    
-    y_min, y_max = np.where(rows)[0][[0, -1]]
-    x_min, x_max = np.where(cols)[0][[0, -1]]
-    
-    return x_min, y_min, x_max + 1, y_max + 1
+    corr_x = _safe_corr(src_x, dst_x)
+    if corr_x < 0:
+        Fh = np.array([[-1,0,W-1],[0,1,0],[0,0,1]], dtype=np.float32)
+        H_i2d = Fh @ H_i2d
+        logger.info("Applied HORIZONTAL flip (corr_x=%.4f)", float(corr_x))
 
-def _crop_source_to_polygon(image: ImageArray, polygon_coords: CoordList, buffer: int) -> Tuple[ImageArray, BoundingBox]:
-    """Crop source image to polygon bounding box + buffer."""
-    coords = np.array(polygon_coords)
-    x_min, y_min = coords.min(axis=0).astype(int)
-    x_max, y_max = coords.max(axis=0).astype(int)
+
+    src_y = (H_g2i @ np.column_stack([plane_quad, np.ones(4)]).T)
+    src_y = (src_y[1] / src_y[2]).ravel()
+    dst_y = (H_g2d @ np.column_stack([plane_quad, np.ones(4)]).T)
+    dst_y = (dst_y[1] / dst_y[2]).ravel()
     
-    x_min = max(0, x_min - buffer)
-    y_min = max(0, y_min - buffer) 
-    x_max = min(image.shape[1], x_max + buffer)
-    y_max = min(image.shape[0], y_max + buffer)
+    corr_y = _safe_corr(src_y, dst_y)
+    if corr_y < 0:
+        Fv = np.array([[1,0,0],[0,-1,H-1],[0,0,1]], dtype=np.float32)
+        H_i2d = Fv @ H_i2d
+        logger.info("Applied VERTICAL flip (corr_y=%.4f)", float(corr_y))
     
-    cropped = image[y_min:y_max, x_min:x_max]
-    crop_offset = (x_min, y_min)
-    return cropped, crop_offset
+    return H_i2d
