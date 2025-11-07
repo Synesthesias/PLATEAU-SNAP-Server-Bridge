@@ -21,18 +21,24 @@ from ..shared.logger import get_logger
 logger = get_logger(__name__)
 
 def rectify_facade(image, pts, geometry_pts, facade_buffer_px=BUFFER_PIXELS):
-    if len(pts) < 4 or len(geometry_pts) < 4:
+    if len(pts) < 3 or len(geometry_pts) < 3:
         logger.warning("rectify_facade: insufficient correspondences (pts=%d, geometry_pts=%d)", len(pts), len(geometry_pts))
-        raise ApiError(400, "Need ≥4 correspondences")
+        raise ApiError(400, "Need ≥3 correspondences")
     
     logger.debug("rectify_facade: start (pts=%d, geometry_pts=%d, buffer=%d)",
                  len(pts), len(geometry_pts), int(facade_buffer_px))
+    num_original_pts = len(pts)
 
     # Plane coords (Y-down to match image)
     plane2d = np.asarray(_geometry_to_y_down_plane_coords(geometry_pts), np.float32)
     img2d   = np.asarray(pts, np.float32)
-
-
+    
+    # If 3 points, synthesize a 4th to form a square
+    if len(plane2d) == 3 and len(img2d) == 3:
+        logger.debug("rectify_facade: synthesizing 4th point from 3 triangle points")
+        plane2d = _get_bounding_box_from_triangle(plane2d)
+        img2d = _get_bounding_box_from_triangle(img2d)
+    
     # Pick pairs (all if lengths match, else 4 corners in TL,TR,BR,BL)
     use_all = (len(plane2d) == len(img2d) and len(plane2d) >= 6)
     if use_all:
@@ -47,7 +53,12 @@ def rectify_facade(image, pts, geometry_pts, facade_buffer_px=BUFFER_PIXELS):
         logger.error("rectify_facade: findHomography failed (pairs=%d)", len(g2))
         raise ApiError(500, "findHomography failed")
 
-
+    # Check if H_g2i is invertible
+    det = np.linalg.det(H_g2i)
+    if abs(det) < 1e-6:
+        logger.error("rectify_facade: homography is singular (det=%.2e)", det)
+        raise ApiError(400, "Homography is singular; insufficient point correspondence")
+    
     # Output size & margins
     W, H = _compute_output_canvas_from_aspect_and_bbox_area(plane2d.tolist(), pts)
     m = max(50, min(W, H)//20)
@@ -69,13 +80,18 @@ def rectify_facade(image, pts, geometry_pts, facade_buffer_px=BUFFER_PIXELS):
     D = np.array([[m,m],[W-m,m],[W-m,H-m],[m,H-m]], np.float32)
 
     H_g2d = cv2.getPerspectiveTransform(P_exp, D)
-    H_i2d = H_g2d @ np.linalg.inv(H_g2i)
+    try:
+        H_i2d = H_g2d @ np.linalg.inv(H_g2i)
+    except np.linalg.LinAlgError as e:
+        logger.error("rectify_facade: failed to invert homography: %s", str(e))
+        raise ApiError(500, "Failed to invert homography matrix")
     
     H_i2d = _fix_axis_flips_by_src_dst_correlation(H_i2d, H_g2i, H_g2d, P_exp, W, H)
 
     warped = cv2.warpPerspective(image, H_i2d, (W, H))
     warped_pts = _apply_homography_to_points(pts, H_i2d)
-    logger.debug("rectify_facade: warp complete; transformed %d points", len(pts))
+    warped_pts = warped_pts[:num_original_pts]
+    logger.debug("rectify_facade: warp complete; transformed %d points", len(warped_pts))
     return warped, [(float(x), float(y)) for x,y in warped_pts]
 
 
@@ -168,3 +184,29 @@ def _fix_axis_flips_by_src_dst_correlation(H_i2d, H_g2i, H_g2d, plane_quad, W, H
         logger.info("Applied VERTICAL flip (corr_y=%.4f)", float(corr_y))
     
     return H_i2d
+
+def _get_bounding_box_from_triangle(pts_3):
+    """
+    Given 3 points forming a triangle, find the bounding rect.
+    Returns box points in canonical TL, TR, BR, BL order.
+    """
+    pts_array = np.array(pts_3, dtype=np.float32)
+    rect = cv2.minAreaRect(pts_array)
+    box = cv2.boxPoints(rect)
+    
+    # Reorder to TL, TR, BR, BL
+    x_min, y_min = box.min(axis=0)
+    x_max, y_max = box.max(axis=0)
+    
+    dists_tl = np.sum((box - (x_min, y_min)) ** 2, axis=1)
+    dists_tr = np.sum((box - (x_max, y_min)) ** 2, axis=1)
+    dists_br = np.sum((box - (x_max, y_max)) ** 2, axis=1)
+    dists_bl = np.sum((box - (x_min, y_max)) ** 2, axis=1)
+    
+    tl = np.argmin(dists_tl)
+    tr = np.argmin(dists_tr)
+    br = np.argmin(dists_br)
+    bl = np.argmin(dists_bl)
+    
+    ordered_box = np.array([box[tl], box[tr], box[br], box[bl]], dtype=np.float32)
+    return ordered_box
