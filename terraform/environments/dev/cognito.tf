@@ -79,8 +79,8 @@ resource "aws_cognito_user_pool_client" "cms" {
   refresh_token_validity = 30
 
   token_validity_units {
-    access_token  = "hours"
-    id_token      = "hours"
+    access_token  = "days"
+    id_token      = "days"
     refresh_token = "days"
   }
 

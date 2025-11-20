@@ -43,8 +43,16 @@ public class Function
             ArgumentNullException.ThrowIfNull(secretName);
 
             var response = new AmazonSecretsManagerClient().GetSecretValueAsync(new GetSecretValueRequest() { SecretId = secretName }).Result;
+            
+            // 環境変数形式(Database__Port)を階層構造に変換
+            var secretDict = JsonSerializer.Deserialize<Dictionary<string, string?>>(response.SecretString)!;
+            var convertedDict = secretDict.ToDictionary(
+                kvp => kvp.Key.Replace("__", ":"),
+                kvp => kvp.Value
+            );
+            
             var secretConfig = new ConfigurationBuilder()
-                .AddInMemoryCollection(JsonSerializer.Deserialize<Dictionary<string, string?>>(response.SecretString)!)
+                .AddInMemoryCollection(convertedDict)
                 .Build();
 
             var databaseSettings = secretConfig.GetSection("Database").Get<DatabaseSettings>();

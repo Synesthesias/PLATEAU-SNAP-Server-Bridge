@@ -12,6 +12,8 @@ resource "aws_lb" "default" {
     aws_subnet.public_1a.id,
     aws_subnet.public_1c.id,
   ]
+
+  idle_timeout = 300
 }
 
 # Target Group for ECS API

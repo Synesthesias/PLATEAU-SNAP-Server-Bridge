@@ -26,3 +26,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "default" {
     }
   }
 }
+
+resource "aws_s3_bucket_cors_configuration" "default" {
+  bucket = aws_s3_bucket.default.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET"]
+    allowed_origins = ["*"]
+    expose_headers  = ["Access-Control-Allow-Origin"]
+  }
+}

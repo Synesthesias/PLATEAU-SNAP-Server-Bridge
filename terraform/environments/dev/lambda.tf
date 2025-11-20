@@ -25,14 +25,14 @@ locals {
   export_functions = {
     "${local.app_name}-export_building" = {
       handler               = "PLATEAU.Snap.Server.Lambda::PLATEAU.Snap.Server.Lambda.Function::ExportBuilding"
-      memory                = 1024
+      memory                = 4096
       timeout               = 120
       needs_internet_access = false
       description           = "Handles data export to S3"
     },
     "${local.app_name}-export_mesh" = {
       handler               = "PLATEAU.Snap.Server.Lambda::PLATEAU.Snap.Server.Lambda.Function::ExportMesh"
-      memory                = 2048
+      memory                = 4096
       timeout               = 300
       needs_internet_access = false
       description           = "Handles data export to S3"
@@ -184,6 +184,10 @@ resource "aws_lambda_function" "export_lambdas" {
     security_group_ids = [
       aws_security_group.lambda_rds.id
     ]
+  }
+  
+  ephemeral_storage {
+    size = 10240
   }
 
   environment {
