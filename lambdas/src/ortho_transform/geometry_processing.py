@@ -21,23 +21,30 @@ def wkt_polygon_to_coords(wkt_string: str) -> CoordList:
 
 def _compute_axis_aligned_size_2d(plane_geometry_pts: CoordList) -> Tuple[float, float]:
     """
-    Calculate real-world dimensions from a list of **2D plane** geometry coordinates.
-    Returns (width, height). Returns (0.0, 0.0) on failure.
+    Calculate dimensions using percentiles. This ignores outliers
     """
     if not plane_geometry_pts:
         return 0.0, 0.0
 
     try:
         coords = np.array(plane_geometry_pts)
+        # 2nd and 98th percentiles instead of min/max to clip outliers
         xs = coords[:, 0]
         ys = coords[:, 1]
-        width, height = np.max(xs) - np.min(xs), np.max(ys) - np.min(ys)
-        logger.debug(f"Using 2D geometry for dimensions: {width:.2f}x{height:.2f}")
+        
+        x_min, x_max = np.percentile(xs, [2, 98])
+        y_min, y_max = np.percentile(ys, [2, 98])
+        
+        if x_max - x_min < 1e-4: x_min, x_max = np.min(xs), np.max(xs)
+        if y_max - y_min < 1e-4: y_min, y_max = np.min(ys), np.max(ys)
 
+        width = x_max - x_min
+        height = y_max - y_min
+        
         return (width, height) if width > 0 and height > 0 else (0.0, 0.0)
 
-    except (IndexError, TypeError) as e:
-        logger.warning(f"Failed to parse geometry for dimensions: {e}. Cannot determine aspect ratio.")
+    except (IndexError, TypeError, ValueError) as e:
+        logger.warning(f"Failed to parse geometry: {e}")
         return 0.0, 0.0
 
 
@@ -45,7 +52,7 @@ def _geometry_to_y_down_plane_coords(geometry_pts: CoordList) -> List[List[float
     """Process geometry coordinates, handling 3D projection if needed."""
     if len(geometry_pts) > 0 and len(geometry_pts[0]) >= 3:
         points_3d = np.array(geometry_pts, dtype=np.float32)
-        normalized_coords = _pca_project_3d_facade_to_2d(points_3d)
+        normalized_coords = _project_facade_3d_to_2d(points_3d)
         max_y = np.max(normalized_coords[:, 1])
         geometry = [[pt[0], max_y - pt[1]] for pt in normalized_coords]
     else:
@@ -55,100 +62,187 @@ def _geometry_to_y_down_plane_coords(geometry_pts: CoordList) -> List[List[float
     return geometry
 
 
-def _pca_project_3d_facade_to_2d(points_3d: np.ndarray) -> np.ndarray:
+def _project_facade_3d_to_2d(points_3d: np.ndarray) -> np.ndarray:
     """
-    Projects 3D points to the best-fitting facade plane using PCA,
-    and normalizes them to a (0,0) origin.
-    Uses Z-axis (height) to determine proper orientation.
+    Projects 3D facade points onto a 2D plane.
+    
+    Uses SVD to find the best-fit plane, then projects using:
+    - World Z as vertical reference (for vertical facades)
+    - Primary variance direction for horizontal axis (4+ points)
+    - Edge-based heuristics for triangles (3 points)
     """
-    if len(points_3d) < 3:
-        logger.warning(
-            "Need at least 3 points to define a plane. Using XZ projection as fallback."
-        )
-        facade_coords = points_3d[:, [0, 2]]
-        min_vals = np.min(facade_coords, axis=0)
-        return facade_coords - min_vals
-
-    # Calculate the centroid and center the points
+    points_3d = np.asarray(points_3d, dtype=np.float64)
+    n_points = len(points_3d)
+    
+    if n_points < 3:
+        logger.warning("Need at least 3 points for 3D projection, got %d", n_points)
+        if n_points == 0:
+            return np.zeros((0, 2), dtype=np.float32)
+        # Fallback for lines/points: just drop the Z axis
+        result = points_3d[:, [0, 2]] if points_3d.shape[1] >= 3 else points_3d[:, :2]
+        return (result - result.min(axis=0)).astype(np.float32)
+    
     centroid = np.mean(points_3d, axis=0)
-    centered_points = points_3d - centroid
-    logger.debug(f"Original points shape: {points_3d.shape}, centroid: {centroid}")
-
-    # Analyze Z variation (height)
+    centered = points_3d - centroid
+    
+    try:
+        _, s, vh = np.linalg.svd(centered, full_matrices=False)
+    except np.linalg.LinAlgError:
+        logger.error("SVD failed in 3D projection")
+        return np.zeros((n_points, 2), dtype=np.float32)
+    
+    # Sanity checks for degenerate geometry (points all in one spot, or a straight line)
+    tolerance = 1e-6 * s[0] if s[0] > 0 else 1e-6
+    
+    if s[0] < tolerance:
+        logger.warning("All 3D points are coincident")
+        return np.zeros((n_points, 2), dtype=np.float32)
+    
+    if s[1] < tolerance:
+        logger.warning("3D points are collinear, projecting onto line")
+        line_dir = vh[0]
+        t_values = centered @ line_dir
+        t_values -= t_values.min()
+        return np.column_stack([t_values, np.zeros(n_points)]).astype(np.float32)
+    
+    normal = vh[2] # Smallest variance direction
+    
+    # Heuristic: Is this a wall or a floor/roof?
     z_coords = points_3d[:, 2]
-    z_min, z_max = np.min(z_coords), np.max(z_coords)
-    height_variation = z_max - z_min
-    logger.debug(
-        f"Z-axis range: [{z_min:.2f}, {z_max:.2f}], height variation: {height_variation:.2f}"
-    )
-
-    # PCA
-    covariance_matrix = np.cov(centered_points.T)
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
-    sorted_indices = np.argsort(eigenvalues)[::-1]
-    sorted_eigenvalues = eigenvalues[sorted_indices]
-    sorted_eigenvectors = eigenvectors[:, sorted_indices]
-
-    # Plane normal is the smallest eigenvector
-    plane_normal = sorted_eigenvectors[:, 2]
-    logger.debug(f"Eigenvalues (desc): {sorted_eigenvalues}")
-    logger.debug(f"Plane normal: {plane_normal}")
-
-    # Decide facade type
-    vertical_component = abs(plane_normal[2])  # Z component
+    height_variation = z_coords.max() - z_coords.min()
+    vertical_component = abs(normal[2])
     is_vertical_facade = height_variation > 1.0 and vertical_component < 0.7
-
-    if is_vertical_facade:
-        # Vertical facade: horizontal axis from primary component projected to XY,
-        # vertical axis aligned with world Z.
-        primary_component = sorted_eigenvectors[:, 0]
-        horizontal_component = np.array([primary_component[0], primary_component[1], 0])
-
-        if np.linalg.norm(horizontal_component) < 1e-6:
-            horizontal_component = np.array([1, 0, 0])
-        else:
-            horizontal_component = horizontal_component / np.linalg.norm(
-                horizontal_component
-            )
-
-        u = horizontal_component                    # horizontal
-        v = np.array([0, 0, 1])                     # vertical (world Z)
-    else:
-        # Horizontal surface: use top two principal components
-        u = sorted_eigenvectors[:, 0]
-        v = sorted_eigenvectors[:, 1]
-
-    # Orthonormalize
-    u = u / np.linalg.norm(u)
-    v = v / np.linalg.norm(v)
-
-    if is_vertical_facade:
-        # Ensure v ⟂ u
-        v = v - np.dot(v, u) * u
-        v = v / np.linalg.norm(v)
-    else:
-        # Ensure right-handed system for horizontal surfaces
-        cross_product = np.cross(u, v)
-        if np.dot(cross_product, plane_normal) < 0:
-            u = -u
-
-    facade_type = "vertical" if is_vertical_facade else "horizontal"
-    logger.info(f"Facade type: {facade_type}, height variation: {height_variation:.2f}")
-    logger.info(f"Projecting to facade plane with normal: {plane_normal}")
-    logger.debug(f"Final basis vectors - u (horizontal): {u}, v (vertical): {v}")
-
-    # Project to 2D and normalize to (0,0)
-    projected_2d = np.column_stack(
-        [np.dot(centered_points, u), np.dot(centered_points, v)]
+    
+    logger.debug(
+        "Facade analysis: height_var=%.2f, normal_z=%.3f, is_vertical=%s, n_points=%d",
+        height_variation, vertical_component, is_vertical_facade, n_points
     )
-    min_vals = np.min(projected_2d, axis=0)
-    normalized_coords = projected_2d - min_vals
+    
+    if is_vertical_facade:
+        # Use world Z as vertical
+        v_axis = np.array([0.0, 0.0, 1.0])
+        
+        if n_points == 3:
+            u_axis = _find_horizontal_axis_from_triangle(points_3d, normal)
+        else:
+            u_axis = _find_horizontal_axis_from_variance(vh, normal)
+        
+        # Force u_axis to be perfectly perpendicular to Z.
+        u_axis = u_axis - np.dot(u_axis, v_axis) * v_axis
+        u_norm = np.linalg.norm(u_axis)
+        if u_norm > 1e-9:
+            u_axis = u_axis / u_norm
+        else:
+            u_axis = np.cross(v_axis, normal)
+            u_axis = u_axis / np.linalg.norm(u_axis)
+    else:
+        # use pca directly
+        u_axis = vh[0]
+        v_axis = vh[1]
+        
+        if np.dot(np.cross(u_axis, v_axis), normal) < 0:
+            u_axis = -u_axis
+    
+    projected_2d = np.column_stack([
+        centered @ u_axis,
+        centered @ v_axis
+    ])
+    
+    min_vals = projected_2d.min(axis=0)
+    projected_2d -= min_vals
+    
+    logger.debug(
+        "3D→2D projection: normal=%s, u_axis=%s, v_axis=%s",
+        np.round(normal, 4), np.round(u_axis, 4), np.round(v_axis, 4)
+    )
+    logger.debug(
+        "Projected 2D bounds: x=[%.2f, %.2f], y=[%.2f, %.2f]",
+        projected_2d[:, 0].min(), projected_2d[:, 0].max(),
+        projected_2d[:, 1].min(), projected_2d[:, 1].max()
+    )
+    
+    return projected_2d.astype(np.float32)
 
-    final_width = np.max(normalized_coords[:, 0])
-    final_height = np.max(normalized_coords[:, 1])
-    logger.debug(f"Final normalized dimensions: {final_width:.2f} x {final_height:.2f}")
 
-    return normalized_coords
+def _find_horizontal_axis_from_triangle(points_3d: np.ndarray, normal: np.ndarray) -> np.ndarray:
+    """
+    For a triangle, find the horizontal axis by identifying the most horizontal edge.
+    
+    This handles cases like gable ends where two points share the same Z (base)
+    and one point is at a different Z (apex).
+    """
+    n = len(points_3d)
+    
+    best_edge = None
+    best_horizontalness = -1.0
+    
+    for i in range(n):
+        j = (i + 1) % n
+        edge = points_3d[j] - points_3d[i]
+        edge_len = np.linalg.norm(edge)
+        
+        if edge_len < 1e-6:
+            continue
+        
+        edge_normalized = edge / edge_len
+        
+        # We want edges that are long AND flat (low Z-component).
+        horizontalness = 1.0 - abs(edge_normalized[2])
+        score = horizontalness * edge_len
+        
+        if score > best_horizontalness:
+            best_horizontalness = score
+            best_edge = edge_normalized
+    
+    if best_edge is None:
+        # Fallback: use cross product of normal with Z
+        fallback = np.cross(np.array([0, 0, 1]), normal)
+        norm = np.linalg.norm(fallback)
+        if norm > 1e-9:
+            return fallback / norm
+        return np.array([1.0, 0.0, 0.0])
+    
+    # Project the best edge onto XY plane to get pure horizontal
+    horizontal = np.array([best_edge[0], best_edge[1], 0.0])
+    h_norm = np.linalg.norm(horizontal)
+    
+    if h_norm < 1e-6:
+        # Edge was purely vertical. Rotate 90 deg in XY plane.
+        perp = np.array([-best_edge[1], best_edge[0], 0.0])
+        p_norm = np.linalg.norm(perp)
+        if p_norm > 1e-9:
+            return perp / p_norm
+        return np.array([1.0, 0.0, 0.0])
+    
+    return horizontal / h_norm
+
+
+def _find_horizontal_axis_from_variance(vh: np.ndarray, normal: np.ndarray) -> np.ndarray:
+    """
+    Finds horizontal axis for 4+ points.
+    
+    Why this exists: For tall facades, the primary variance is vertical (height).
+    We need to check if the primary axis is actually horizontal before using it.
+    """
+    primary_direction = vh[0]
+    
+    horizontal = np.array([primary_direction[0], primary_direction[1], 0.0])
+    h_norm = np.linalg.norm(horizontal)
+    
+    # If primary direction is vertical (like a tower), switch to secondary direction (width)
+    if h_norm < 1e-6:
+        secondary_direction = vh[1]
+        horizontal = np.array([secondary_direction[0], secondary_direction[1], 0.0])
+        h_norm = np.linalg.norm(horizontal)
+        
+        if h_norm < 1e-6:
+            fallback = np.cross(np.array([0, 0, 1]), normal)
+            f_norm = np.linalg.norm(fallback)
+            if f_norm > 1e-9:
+                return fallback / f_norm
+            return np.array([1.0, 0.0, 0.0])
+    
+    return horizontal / h_norm
 
 
 def _apply_homography_to_points(points: CoordList, matrix: np.ndarray) -> CoordList:
@@ -156,25 +250,12 @@ def _apply_homography_to_points(points: CoordList, matrix: np.ndarray) -> CoordL
     points_array = np.array(points, dtype=np.float32)
     ones = np.ones((len(points_array), 1), dtype=np.float32)
     homogeneous_points = np.hstack([points_array, ones])
-    
     transformed_homogeneous = matrix @ homogeneous_points.T
-    transformed_points = (transformed_homogeneous[:2] / transformed_homogeneous[2]).T
-    
+    w = transformed_homogeneous[2]
+    w[np.abs(w) < 1e-9] = 1e-9
+    transformed_points = (transformed_homogeneous[:2] / w).T
     return [(float(x), float(y)) for x, y in transformed_points]
 
-def _index_corners_tl_tr_br_bl(points: np.ndarray) -> np.ndarray:
-    """Return indexes of TL, TR, BR, BL using min/max coordinate anchors."""
-    x_min, y_min = points.min(axis=0)
-    x_max, y_max = points.max(axis=0)
-    dists_tl = np.sum((points - (x_min, y_min)) ** 2, axis=1)
-    dists_tr = np.sum((points - (x_max, y_min)) ** 2, axis=1)
-    dists_br = np.sum((points - (x_max, y_max)) ** 2, axis=1)
-    dists_bl = np.sum((points - (x_min, y_max)) ** 2, axis=1)
-    tl = np.argmin(dists_tl)
-    tr = np.argmin(dists_tr)
-    br = np.argmin(dists_br)
-    bl = np.argmin(dists_bl)
-    return np.array([tl, tr, br, bl], dtype=np.int32)
 
 def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
     """Pearson corr; returns 0 if either is (near) constant to avoid NaNs."""
