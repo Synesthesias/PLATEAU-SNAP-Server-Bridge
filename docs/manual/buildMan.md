@@ -73,7 +73,8 @@ psql -c "\copy city_boundary from city_boundary.csv delimiter ',' csv;" -h local
     "Bucket": "plateausnap-dev"
   },
   "App": {
-    "ApiKey": "123"
+    "ApiKey": "123",
+    "ImportExportToolPath": "/app/3DCityDB-Importer-Exporter/bin/impexp"
   }
 }
 ```
@@ -92,6 +93,9 @@ psql -c "\copy city_boundary from city_boundary.csv delimiter ',' csv;" -h local
 ※実行環境では S3 からダウンロードする仕組みになっています。
 
 ## 実行
+
+どの方法でもアプリケーションを Debug ビルドで起動すると、Swagger UI が立ち上がります。  
+Release ビルドでも Swagger UI を起動したい場合、環境変数 UseSwagger に true を設定してください。
 
 ### Visual Studio
 
