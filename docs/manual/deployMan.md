@@ -2,8 +2,7 @@
 
 ## アーキテクチャ
 
-アーキテクチャは以下の通りです。  
-EC2 の部分は ECS にしたほうがより良いと考えられますが、今回は EC2 でと指定があったためそのようにしています。
+アーキテクチャは以下の通りです。
 
 ![アーキテクチャ図](../resources/architectur.drawio.svg)
 
@@ -214,45 +213,17 @@ psql -c "\copy citydb.city_boundary from city_boundary.csv delimiter ',' csv;" -
 
 #### Secrets Manager に Secret を登録
 
+Database**Database, Database**Username, Database\_\_Password に [データベース作成](#データベース作成) で登録した情報を追加します。  
 JSON View で設定する場合は `"<port>"` の部分もダブルクォーテーションで囲わないといけないため注意してください。
 
 ```json
 {
-  "Database:Host": "<host>",
-  "Database:Port": "<port>",
-  "Database:Database": "citydb_v4",
-  "Database:Username": "citydb_user",
-  "Database:Password": "<password>",
-  "S3:Bucket": "<bucket>"
+  "Database__Host": "<host>",
+  "Database__Port": "<port>",
+  "Database__Database": "citydb_v4",
+  "Database__Username": "citydb_user",
+  "Database__Password": "<password>",
+  "S3__Bucket": "<bucket>",
+  "App__ApiKey": "<api_key>"
 }
-```
-
-#### docker-compose.yml の設定
-
-事前に SCP などで docker-compose.yml をアップロードしておきます。  
-必要に応じて nginx などを使ってもよいが、将来的に ECS に置き換える場合は不要なので、今回は直接 80 と 443 に直接公開しています。  
-※ただし、現状はドメインを取得していないため 443 では接続できません。
-
-```bash
-vi docker-compose.yml
-```
-
-```yml
-services:
-  plateau.snap.server:
-    image: <account_id>.dkr.ecr.<region>.amazonaws.com/<repository>:<tag>
-    ports:
-      - "80:8080"
-      - "443:8081"
-    restart: always
-    environment:
-      - AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
-      - AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
-      - SECRET_NAME=<SECRET_NAME>
-```
-
-## 起動
-
-```bash
-docker-compose up -d --build --no-cache
 ```
