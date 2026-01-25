@@ -49,7 +49,7 @@ resource "aws_lambda_function" "geo_lambdas" {
   for_each = local.functions
 
   function_name = each.key
-  architectures = ["arm64"]
+  architectures = ["x86_64"]
   role          = aws_iam_role.lambda_exec_role.arn
   depends_on    = [aws_cloudwatch_log_group.lambda_logs] # logs must exist before lambda deployment
 

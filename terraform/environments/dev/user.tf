@@ -1,10 +1,22 @@
-
-data "aws_iam_group" "default" {
-  group_name = local.iam.group_name
+# ---------------------------------------------
+# IAM Group
+# ---------------------------------------------
+resource "aws_iam_group" "default" {
+  name = local.iam.group_name
 }
 
-data "aws_iam_user" "default" {
-  user_name = local.iam.user_name
+# ---------------------------------------------
+# IAM User
+# ---------------------------------------------
+resource "aws_iam_user" "default" {
+  name = local.iam.user_name
+}
+
+resource "aws_iam_user_group_membership" "default" {
+  user = aws_iam_user.default.name
+  groups = [
+    aws_iam_group.default.name
+  ]
 }
 
 # ---------------------------------------------
@@ -34,7 +46,7 @@ resource "aws_iam_policy" "allow_s3_rw" {
 
 resource "aws_iam_group_policy_attachment" "allow_s3_rw" {
   policy_arn = aws_iam_policy.allow_s3_rw.arn
-  group      = data.aws_iam_group.default.group_name
+  group      = aws_iam_group.default.name
 }
 
 data "aws_iam_policy_document" "allow_secret_manager_r" {
@@ -61,7 +73,7 @@ resource "aws_iam_policy" "allow_secret_manager_r" {
 
 resource "aws_iam_group_policy_attachment" "allow_rds_secret_manager_r" {
   policy_arn = aws_iam_policy.allow_secret_manager_r.arn
-  group      = data.aws_iam_group.default.group_name
+  group      = aws_iam_group.default.name
 }
 
 data "aws_iam_policy_document" "allow_ecr_pull" {
@@ -88,7 +100,7 @@ resource "aws_iam_policy" "allow_ecr_pull" {
 
 resource "aws_iam_group_policy_attachment" "allow_ecr_pull" {
   policy_arn = aws_iam_policy.allow_ecr_pull.arn
-  group      = data.aws_iam_group.default.group_name
+  group      = aws_iam_group.default.name
 }
 
 data "aws_iam_policy_document" "allow_ecr_push" {
@@ -128,7 +140,7 @@ resource "aws_iam_policy" "allow_ecr_push" {
 
 resource "aws_iam_group_policy_attachment" "allow_ecr_push" {
   policy_arn = aws_iam_policy.allow_ecr_push.arn
-  group      = data.aws_iam_group.default.group_name
+  group      = aws_iam_group.default.name
 }
 resource "aws_iam_group_policy" "lambda_invoke" {
   name  = "${local.app_name}-lambda-invoke"
