@@ -1,6 +1,6 @@
 # PLATEAU-SNAP-Server
 
-![アーキテクチャ](./docs/images/architectur.drawio.svg)
+![アーキテクチャ](./docs/resources/architectur.drawio.svg)
 
 ## 1. 概要
 
