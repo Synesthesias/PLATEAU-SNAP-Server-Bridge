@@ -9,14 +9,19 @@
 
 ## 2. 「PLATEAU-SNAP-Server」について
 
-スマートフォンで撮影した画像をもとに 3D 都市モデルの建物地物のテクスチャ(地物の外観)を抽出・生成し、3D 都市モデルのデータベースに登録・蓄積可能なツール「PLATEAU SNAP」を開発しました。
+スマートフォンで撮影した画像をもとに 3D 都市モデルの建物地物のテクスチャ(地物の外観)を抽出・生成し、PLATEAU SNAPのデータベースに登録・蓄積可能なツールを開発しました。
 
 本システムは、同ツールのバックエンドサーバーとして機能します。
 
-- スマートフォン向けアプリ「PLATEAU-SNAP-App」向けには、撮影可能面一覧の取得および撮影した画像をアップロードする機能を提供します。
+- スマートフォン向けアプリ「PLATEAU-SNAP-App」向けには、撮影可能面一覧の取得および撮影した画像を「PLATEAU SNAP Server」にアップロードする機能を提供します。
 - ブラウザ向けアプリ「PLATEAU-SNAP-CMS」向けには、撮影した画像をもとにテクスチャを更新する機能を提供します。
 
-スマートフォン向けアプリのリポジトリは 「[PLATEAU-SNAP-App](https://github.com/Synesthesias/PLATEAU-SNAP-App)」にて管理されています。ブラウザ向けアプリのリポジトリは 「[PLATEAU-SNAP-CMS](https://github.com/Synesthesias/PLATEAU-SNAP-CMS)」にて管理されています。詳細については、各リポジトリをご確認ください。
+
+各リポジトリの役割は以下の通りです。
+- [PLATEAU-SNAP-App](https://github.com/Synesthesias/PLATEAU-SNAP-App): 画像の撮影・アップロード
+- PLATEAU-SNAP-Server: データの蓄積、画像処理、モデル生成（バックエンド処理）
+- [PLATEAU-SNAP-CMS](https://github.com/Synesthesias/PLATEAU-SNAP-CMS): テクスチャの生成・貼り付け、データベース更新、データ出力
+
 
 ## 3. 利用手順
 
