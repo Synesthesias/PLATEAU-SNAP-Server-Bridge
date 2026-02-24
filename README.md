@@ -78,28 +78,27 @@ Web API
 
 ## 7. 本リポジトリのフォルダ構成
 
-本リポジトリのソースコードは src 内に以下のモジュールごとに配置されています。
 | フォルダ名 | 詳細 |
 | --- | --- |
-|PLATEAU.Snap.Models|モデルクラス|
-|PLATEAU.Snap.Server|Web API のアプリケーション本体|
-|PLATEAU.Snap.Server.Entities|DB から自動生成した O/RM|
-|PLATEAU.Snap.Server.Geoid|ジオイド高を利用して楕円体高に補正する機能を提供|
-|PLATEAU.Snap.Server.Lambda|非同期で動作する機能を提供|
-|PLATEAU.Snap.Server.Repositories|リポジトリ層のインターフェース|
-|PLATEAU.Snap.Server.Repositories.PostgreSQL|リポジトリ層の PostgreSQL 実装|
-|PLATEAU.Snap.Server.Repositories.S3|リポジトリ層の S3 実装|
-|PLATEAU.Snap.Server.Services|サービス層のインターフェース|
-|PLATEAU.Snap.Server.Services.Impl|サービス層の実装|
-|PLATEAU.Snap.Server.Test|Unit テスト|
-
-画像処理部分のソースコードについては lambda/src 内に以下のモジュールごとに配置されています。
-| フォルダ名 | 詳細 |
-| --- | --- |
-|ortho_transform|正射変換機能を提供|
-|roof_extraction|屋根面生成機能を提供|
-|shared|共通で使うユーティリティ群|
-|texture_building|テクスチャ生成機能を提供|
+|data|環境設定で必要なデータ|
+|docs|ドキュメント (操作マニュアル等)|
+|lambda/src/ortho_transform|正射変換機能を提供|
+|lambda/src/roof_extraction|屋根面生成機能を提供|
+|lambda/src/shared|共通で使うユーティリティ群|
+|lambda/src/texture_building|テクスチャ生成機能を提供|
+|sql|環境設定で必要なSQL|
+|src/PLATEAU.Snap.Models|モデルクラス|
+|src/PLATEAU.Snap.Server|Web API のアプリケーション本体|
+|src/PLATEAU.Snap.Server.Entities|DB から自動生成した O/RM|
+|src/PLATEAU.Snap.Server.Geoid|ジオイド高を利用して楕円体高に補正する機能を提供|
+|src/PLATEAU.Snap.Server.Lambda|非同期で動作する機能を提供|
+|src/PLATEAU.Snap.Server.Repositories|リポジトリ層のインターフェース|
+|src/PLATEAU.Snap.Server.Repositories.PostgreSQL|リポジトリ層の PostgreSQL 実装|
+|src/PLATEAU.Snap.Server.Repositories.S3|リポジトリ層の S3 実装|
+|src/PLATEAU.Snap.Server.Services|サービス層のインターフェース|
+|src/PLATEAU.Snap.Server.Services.Impl|サービス層の実装|
+|src/PLATEAU.Snap.Server.Test|Unit テスト|
+|terraform|AWS にデプロイするためのコード|
 
 ## 8. ライセンス
 

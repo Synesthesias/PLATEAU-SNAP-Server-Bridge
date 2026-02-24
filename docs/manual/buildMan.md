@@ -123,11 +123,7 @@ psql -c "\copy city_boundary from city_boundary.csv with (format csv, delimiter 
 どの方法でもアプリケーションを Debug ビルドで起動すると、Swagger UI が立ち上がります。  
 Release ビルドでも Swagger UI を起動したい場合、環境変数 UseSwagger に true を設定してください。
 
-<<<<<<< HEAD
 #### Visual Studio
-=======
-### Visual Studio
->>>>>>> origin/main
 
 1. PLATEAU.Snap.Server.sln を開きます。
 2. PLATEAU.Snap.Server をスタートアッププロジェクトに設定します。
