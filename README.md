@@ -82,10 +82,10 @@ Web API
 | --- | --- |
 |data|環境設定で必要なデータ|
 |docs|ドキュメント (操作マニュアル等)|
-|lambda/src/ortho_transform|正射変換機能を提供|
-|lambda/src/roof_extraction|屋根面生成機能を提供|
-|lambda/src/shared|共通で使うユーティリティ群|
-|lambda/src/texture_building|テクスチャ生成機能を提供|
+|lambdas/src/ortho_transform|正射変換機能を提供|
+|lambdas/src/roof_extraction|屋根面生成機能を提供|
+|lambdas/src/shared|共通で使うユーティリティ群|
+|lambdas/src/texture_building|テクスチャ生成機能を提供|
 |sql|環境設定で必要なSQL|
 |src/PLATEAU.Snap.Models|モデルクラス|
 |src/PLATEAU.Snap.Server|Web API のアプリケーション本体|
