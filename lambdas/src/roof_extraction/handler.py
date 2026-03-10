@@ -1,9 +1,5 @@
 """
 Mosaic-and-crop an AOI from Plateau ortho, then upload the PNG to S3.
-
-Environment variables
-- OUTPUT_S3_BUCKET (required): where to store the final image
-
 """
 from __future__ import annotations
 
@@ -11,19 +7,29 @@ import math
 from os import environ
 import uuid
 from datetime import datetime, timezone
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 
-import cv2
-import mercantile
-import numpy as np
 import requests
 from requests.adapters import HTTPAdapter, Retry
-from shapely.geometry import Polygon
-from shapely.wkt import loads as load_wkt
 
 from ..shared.response_formatters import _resp
 from ..shared.s3_utils import upload_png_to_s3
 from ..shared.decorators import api_handler, ApiError
+from ..shared.logger import get_logger
+from ..shared.lazy_imports import (
+    get_numpy,
+    get_cv2,
+    get_mercantile,
+    get_shapely_wkt,
+    get_shapely_polygon,
+)
+
+if TYPE_CHECKING:
+    import numpy as np
+    from shapely.geometry import Polygon
+
+logger = get_logger(__name__)
+
 TILE_SIZE = 256
 URL_TEMPLATE = (
     "https://api.plateauview.mlit.go.jp/tiles/plateau-ortho-2023/{z}/{x}/{y}.png"
@@ -32,20 +38,17 @@ ZOOM_LEVEL = int(environ.get("ROOF_EXTRACTION_ZOOM", "18"))
 EARTH_RADIUS = 6378137
 
 
-from ..shared.logger import get_logger
-logger = get_logger(__name__)
-
 @api_handler
 def lambda_handler(body, _context):
-    logger.info("λ start (plateau) – geometry: %s", body.get("geometry"))
+    logger.info("λ start (plateau) - geometry: %s", body.get("geometry"))
     wkt: str | None = body.get("geometry")
-    if not (wkt):
-        logger.warning("Missing geometry param") 
+    if not wkt:
+        logger.warning("Missing geometry param")
         raise ApiError(400, "Missing required parameters: geometry")
 
     bucket = environ.get("OUTPUT_S3_BUCKET")
     if not bucket:
-        logger.error("OUTPUT_S3_BUCKET env var not set") 
+        logger.error("OUTPUT_S3_BUCKET env var not set")
         raise RuntimeError("OUTPUT_S3_BUCKET env var not set")
 
     coords = parse_wkt_polygon(wkt)
@@ -63,9 +66,10 @@ def lambda_handler(body, _context):
 
 
 def parse_wkt_polygon(wkt: str) -> List[Tuple[float, float]]:
-    logger.debug("Parsing WKT: %s", wkt)  
+    wkt_mod = get_shapely_wkt()
+    logger.debug("Parsing WKT: %s", wkt)
     try:
-        poly = load_wkt(wkt)
+        poly = wkt_mod.loads(wkt)
         if poly.geom_type != "Polygon":
             raise ValueError
         return list(poly.exterior.coords)
@@ -74,6 +78,7 @@ def parse_wkt_polygon(wkt: str) -> List[Tuple[float, float]]:
 
 
 def _calculate_tile_bounds(lonlat_vertices: List[Tuple[float, float]], zoom: int) -> Tuple[int, int, int, int]:
+    mercantile = get_mercantile()
     tiles = [mercantile.tile(lon, lat, zoom) for lon, lat in lonlat_vertices]
     min_x = min(t.x for t in tiles)
     max_x = max(t.x for t in tiles)
@@ -82,12 +87,15 @@ def _calculate_tile_bounds(lonlat_vertices: List[Tuple[float, float]], zoom: int
     return (min_x, min_y, max_x, max_y)
 
 
-def _create_mosaic(bounds: Tuple[int, int, int, int], zoom: int, session: requests.Session) -> np.ndarray:
+def _create_mosaic(bounds: Tuple[int, int, int, int], zoom: int, session: requests.Session) -> "np.ndarray":
+    np = get_numpy()
     min_x, min_y, max_x, max_y = bounds
     width_in_tiles = max_x - min_x + 1
     height_in_tiles = max_y - min_y + 1
-    
-    mosaic = np.zeros((height_in_tiles * TILE_SIZE, width_in_tiles * TILE_SIZE, 3), dtype=np.uint8,)
+    mosaic = np.zeros(
+        (height_in_tiles * TILE_SIZE, width_in_tiles * TILE_SIZE, 3),
+        dtype=np.uint8,
+    )
 
     for x in range(min_x, max_x + 1):
         for y in range(min_y, max_y + 1):
@@ -95,60 +103,52 @@ def _create_mosaic(bounds: Tuple[int, int, int, int], zoom: int, session: reques
             row_start = (y - min_y) * TILE_SIZE
             col_start = (x - min_x) * TILE_SIZE
             mosaic[row_start : row_start + TILE_SIZE, col_start : col_start + TILE_SIZE] = tile_img
-            
     return mosaic
 
-import os
 
 def _calculate_adaptive_buffer(lonlat_vertices: List[Tuple[float, float]]) -> float:
     """Calculate buffer based on building size"""
-    
     BASE_BUFFER = float(environ.get('BUFFER_BASE_METERS', '20'))
     MIN_BUFFER = float(environ.get('BUFFER_MIN_METERS', '15'))
     MAX_BUFFER = float(environ.get('BUFFER_MAX_METERS', '35'))
-    SIZE_FACTOR = float(environ.get('BUFFER_SIZE_FACTOR', '0.15'))  # ~15% of size
+    SIZE_FACTOR = float(environ.get('BUFFER_SIZE_FACTOR', '0.15'))
     
     if len(lonlat_vertices) < 3:
         return BASE_BUFFER
     
     lons = [lon for lon, lat in lonlat_vertices]
     lats = [lat for lon, lat in lonlat_vertices]
-    
     lon_range = max(lons) - min(lons)
     lat_range = max(lats) - min(lats)
-    
     avg_lat = sum(lats) / len(lats)
     lon_meters = lon_range * 111320 * math.cos(math.radians(avg_lat))
     lat_meters = lat_range * 110540
-    
     building_size = max(lon_meters, lat_meters)
-    
     adaptive_buffer = max(MIN_BUFFER, min(MAX_BUFFER, building_size * SIZE_FACTOR))
-    
     return adaptive_buffer
 
 
-
 def _convert_geo_to_mosaic_pixels(
-    lonlat_vertices: List[Tuple[float, float]], zoom: int, min_tile_x: int, min_tile_y: int) -> List[Tuple[int, int]]:
+    lonlat_vertices: List[Tuple[float, float]], zoom: int, min_tile_x: int, min_tile_y: int
+) -> List[Tuple[int, int]]:
     mosaic_pixels = []
     for lon, lat in lonlat_vertices:
         t_x, t_y, px, py = lonlat_to_pixel(lon, lat, zoom)
-        
         mosaic_px = (t_x - min_tile_x) * TILE_SIZE + px
         mosaic_py = (t_y - min_tile_y) * TILE_SIZE + py
         mosaic_pixels.append((mosaic_px, mosaic_py))
-        
     return mosaic_pixels
 
 
 def mosaic_and_crop(
-    lonlat_vertices: List[Tuple[float, float]], zoom: int, session: requests.Session) -> Tuple[np.ndarray, List[Tuple[int, int]]]:
+    lonlat_vertices: List[Tuple[float, float]], zoom: int, session: requests.Session
+) -> Tuple["np.ndarray", List[Tuple[int, int]]]:
+    np = get_numpy()
+    cv2 = get_cv2()
     
     bounds = _calculate_tile_bounds(lonlat_vertices, zoom)
     logger.info("Tile bounds x:[%d‑%d] y:[%d‑%d]", *bounds)
     min_x, min_y, max_x, max_y = bounds
-    
     mosaic = _create_mosaic(bounds, zoom, session)
     logger.debug("Mosaic shape=%s", mosaic.shape)
     mosaic_pixels = _convert_geo_to_mosaic_pixels(lonlat_vertices, zoom, min_x, min_y)
@@ -166,13 +166,13 @@ def mosaic_and_crop(
     x2, y2 = min(mosaic.shape[1], x + w + buf_px), min(mosaic.shape[0], y + h + buf_px)
 
     crop = mosaic[y1:y2, x1:x2]
-    
     shifted_pixels = [(px - x1, py - y1) for px, py in mosaic_pixels]
-    
+
     return crop, shifted_pixels
 
 
 def coords_to_wkt(pixels: List[Tuple[int, int]]) -> str:
+    Polygon = get_shapely_polygon()
     return Polygon(pixels).wkt
 
 
@@ -191,25 +191,28 @@ def lonlat_to_pixel(lon: float, lat: float, z: int) -> Tuple[int, int, int, int]
 def _build_session() -> requests.Session:
     s = requests.Session()
     s.headers["User-Agent"] = "serverless-tile-processor/1.1 (AWS Lambda; Snap)"
-    
+
     retry_strategy = Retry(
         total=2,
         backoff_factor=0.3,
         status_forcelist=(500, 502, 503, 504, 429),
         allowed_methods=frozenset(["GET"]),
     )
-    
+
     adapter = HTTPAdapter(
         max_retries=retry_strategy,
         pool_connections=10,
         pool_maxsize=10
     )
-    
+
     s.mount("https://", adapter)
     return s
 
 
-def fetch_tile(session: requests.Session, z: int, x: int, y: int) -> np.ndarray:
+def fetch_tile(session: requests.Session, z: int, x: int, y: int) -> "np.ndarray":
+    np = get_numpy()
+    cv2 = get_cv2()
+    
     url = URL_TEMPLATE.format(z=z, x=x, y=y)
     try:
         with session.get(url, timeout=(5, 10)) as resp:
@@ -231,4 +234,3 @@ def fetch_tile(session: requests.Session, z: int, x: int, y: int) -> np.ndarray:
     except requests.RequestException as exc:
         logger.error("Tile %d/%d/%d HTTP error: %s; substituting blank tile", z, x, y, exc)
         return np.zeros((TILE_SIZE, TILE_SIZE, 3), dtype=np.uint8)
-    

@@ -1,15 +1,5 @@
 """
 Warp an image defined by a WKT POLYGON, store the warped PNG in S3, and return its path along with the building coords in the new image.
-### Request JSON
-{
-  "path": "s3://bucket/key.png",
-  "coordinates": "POLYGON((x y, ...))",
-  "geometry":  "POLYGON Z((x y, ...))"
-}
-
-### Env vars
-- OUTPUT_S3_BUCKET (optional): override destination bucket
-- BUFFER_PIXELS (default 100): extra pixels around the crop
 """
 
 from __future__ import annotations
@@ -18,16 +8,21 @@ import uuid
 from datetime import datetime, timezone
 import json
 from urllib.parse import urlparse
-from shapely.geometry import Polygon
+from typing import TYPE_CHECKING
 
 from ..shared.response_formatters import _resp
 from ..shared.s3_utils import download_from_s3, upload_png_to_s3
 from ..shared.decorators import api_handler, ApiError
 from .geometry_processing import wkt_polygon_to_coords
 from .image_processing import rectify_facade
+from ..shared.lazy_imports import get_shapely_polygon
 
 from ..shared.logger import get_logger
 logger = get_logger(__name__)
+
+if TYPE_CHECKING:
+    from shapely.geometry import Polygon
+
 
 @api_handler
 def lambda_handler(body, _context):
@@ -53,6 +48,7 @@ def lambda_handler(body, _context):
     key = f"temp/{folder}/{uuid.uuid4()}_transformed.png"
     out_path = upload_png_to_s3(warped_img, bucket, key)
     
+    Polygon = get_shapely_polygon()
     out_wkt = Polygon(warped_pts).wkt
     logger.debug("λ done - out_wkt=%s", out_wkt[:60])
     return _resp(200, "success", path=out_path, coordinates=out_wkt)

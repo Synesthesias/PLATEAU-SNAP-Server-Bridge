@@ -1,33 +1,29 @@
 """
 Crop a facade from a source image (stored in S3) and return the cropped
 texture plus its UV map.
-
-Expected request JSON
-{
-  "path": "s3://bucket/key.png",
-  "coordinates": "POLYGON((x1 y1, x2 y2, x3 y3, x4 y4, x1 y1))"
-}
-
-Environment
-- OUTPUT_S3_BUCKET  optional – where to save the cropped texture
 """
 from __future__ import annotations
 
 from os import environ
 import uuid
 from datetime import datetime, timezone
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from urllib.parse import urlparse
-
-import numpy as np
-from shapely.geometry import Polygon
-from shapely.wkt import loads as load_wkt
 
 from ..shared.response_formatters import _resp
 from ..shared.s3_utils import download_from_s3, upload_png_to_s3
 from ..shared.decorators import api_handler, ApiError
 from ..shared.logger import get_logger
+
+from ..shared.lazy_imports import get_shapely_wkt, get_shapely_polygon
+
+
+if TYPE_CHECKING:
+    import numpy as np
+
 logger = get_logger(__name__)
+
+
 
 @api_handler
 def lambda_handler(body, _context):
@@ -50,18 +46,20 @@ def lambda_handler(body, _context):
     return _resp(200, "success", path=out_path, texture_coordinates=uv_wkt)
 
 
+def crop_and_generate_uvs(image: "np.ndarray", pixel_wkt: str) -> Tuple["np.ndarray", str]:
+    Polygon = get_shapely_polygon()
+    wkt_mod = get_shapely_wkt()
 
-def crop_and_generate_uvs(image: np.ndarray, pixel_wkt: str) -> Tuple[np.ndarray, str]:
     logger.debug("Parsing pixel-space WKT: %s", pixel_wkt)
-    poly = load_wkt(pixel_wkt)
+    poly = wkt_mod.loads(pixel_wkt)
     if not isinstance(poly, Polygon):
-        logger.warning("Non-polygon WKT received") 
+        logger.warning("Non-polygon WKT received")
         raise ApiError(422, "coordinates must be a WKT POLYGON")
 
     img_h, img_w = image.shape[:2]
     min_x, min_y, max_x, max_y = map(int, poly.bounds)
     if not (0 <= min_x < max_x <= img_w and 0 <= min_y < max_y <= img_h):
-        logger.warning("Polygon (%s) outside image bounds %dx%d", poly.bounds, img_w, img_h)  
+        logger.warning("Polygon (%s) outside image bounds %dx%d", poly.bounds, img_w, img_h)
         raise ApiError(422, "Polygon is outside image bounds")
 
     crop = image[min_y:max_y, min_x:max_x]

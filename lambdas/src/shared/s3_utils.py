@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import os
 from urllib.parse import urlparse, ParseResult
-from typing import NoReturn
+from typing import NoReturn, TYPE_CHECKING
 
 import boto3
-import cv2
-import numpy as np
 from botocore.exceptions import ClientError
 
 from ..shared.decorators import ApiError
+from ..shared.lazy_imports import get_numpy, get_cv2
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 def _parse_s3_uri(s3_uri: str) -> ParseResult:
@@ -36,7 +38,10 @@ def _s3_client():
     return boto3.client("s3", region_name=os.getenv("AWS_REGION", "ap-northeast-1"))
 
 
-def download_from_s3(s3_uri: str) -> np.ndarray:
+def download_from_s3(s3_uri: str) -> "np.ndarray":
+    np = get_numpy()
+    cv2 = get_cv2()
+    
     p = _parse_s3_uri(s3_uri)
     bucket = p.netloc
     key = p.path.lstrip("/")
@@ -54,7 +59,9 @@ def download_from_s3(s3_uri: str) -> np.ndarray:
     return img
 
 
-def upload_png_to_s3(img: np.ndarray, bucket: str, key: str) -> str:
+def upload_png_to_s3(img: "np.ndarray", bucket: str, key: str) -> str:
+    cv2 = get_cv2()
+    
     ok, buf = cv2.imencode(".png", img)
     if not ok:
         raise ApiError(422, "PNG encoding failed")
@@ -71,6 +78,7 @@ def upload_png_to_s3(img: np.ndarray, bucket: str, key: str) -> str:
         _handle_s3_client_error(err, bucket, key)
 
     return f"s3://{bucket}/{key}"
+
 
 def _handle_s3_client_error(err: ClientError, bucket: str, key: str) -> NoReturn:
     error_code = err.response.get("Error", {}).get("Code", "")

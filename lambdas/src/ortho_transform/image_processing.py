@@ -1,17 +1,18 @@
 from os import environ
-from typing import Final
-import numpy as np
-import cv2
-
+from typing import Final, TYPE_CHECKING
 
 from ..shared.decorators import ApiError
 from .geometry_processing import CoordList, Dimensions
 from .geometry_processing import (
     _geometry_to_y_down_plane_coords,
     _safe_corr,
-    _apply_homography_to_points, _compute_axis_aligned_size_2d
+    _apply_homography_to_points, 
+    _compute_axis_aligned_size_2d
 )
+from ..shared.lazy_imports import get_numpy, get_cv2
 
+if TYPE_CHECKING:
+    import numpy as np
 
 BUFFER_PIXELS: Final[int] = int(environ.get("BUFFER_PIXELS", "200"))
 MAX_DIMENSION: Final[int] = 4096
@@ -19,7 +20,12 @@ MAX_DIMENSION: Final[int] = 4096
 from ..shared.logger import get_logger
 logger = get_logger(__name__)
 
+
+
 def rectify_facade(image, pts, geometry_pts, facade_buffer_px=BUFFER_PIXELS):
+    np = get_numpy()
+    cv2 = get_cv2()
+    
     if len(pts) < 3 or len(geometry_pts) < 3:
         logger.warning("rectify_facade: insufficient correspondences")
         raise ApiError(400, "Need ≥3 correspondences")
@@ -64,7 +70,6 @@ def rectify_facade(image, pts, geometry_pts, facade_buffer_px=BUFFER_PIXELS):
     ], dtype=np.float32)
 
     H_g2d = cv2.getPerspectiveTransform(src_rect, dst_rect)
-    
     try:
         H_g2i_inv = np.linalg.inv(H_g2i)
         H_i2d = H_g2d @ H_g2i_inv
@@ -80,12 +85,15 @@ def rectify_facade(image, pts, geometry_pts, facade_buffer_px=BUFFER_PIXELS):
     return warped, [(float(x), float(y)) for x,y in warped_pts]
 
 
-def _find_homography_cyclic(plane_pts: np.ndarray, img_pts: np.ndarray) -> np.ndarray | None:
+def _find_homography_cyclic(plane_pts: "np.ndarray", img_pts: "np.ndarray") -> "np.ndarray | None":
     """
     Calculates homography by testing all cyclic point shifts.
     Resolves rectangular ambiguity (0 vs 90 degree flips) by preferring
     transformations that align 'Geometry Down' with 'Image Down'.
     """
+    np = get_numpy()
+    cv2 = get_cv2()
+    
     n = len(plane_pts)
 
     if n == 3:
@@ -101,44 +109,41 @@ def _find_homography_cyclic(plane_pts: np.ndarray, img_pts: np.ndarray) -> np.nd
 
     for shift in range(n):
         shifted_img = np.roll(img_pts, shift, axis=0)
-        
         H, mask = cv2.findHomography(plane_pts, shifted_img, cv2.RANSAC, 10.0, maxIters=1000)
-        
         if H is not None and abs(np.linalg.det(H)) > 1e-8:
             pts_h = np.hstack([plane_pts, np.ones((n, 1))])
             projected = (H @ pts_h.T).T
             projected = projected[:, :2] / projected[:, 2:3]
             error = np.mean(np.linalg.norm(projected - shifted_img, axis=1))
-            
             vec_pts = np.array([[0.0, 0.0], [0.0, 1.0]], dtype=np.float32)
             vec_pts_h = np.hstack([vec_pts, np.ones((2, 1))])
             vec_proj = (H @ vec_pts_h.T).T
             vec_proj = vec_proj[:, :2] / vec_proj[:, 2:3]
-            
             img_down_vec = vec_proj[1] - vec_proj[0]
             norm = np.linalg.norm(img_down_vec)
-            
             alignment_score = (img_down_vec[1] / norm) if norm > 1e-6 else 0
 
             current_best_error = best_metric[0]
-            
             is_better = False
             if error < current_best_error - 5.0:
                 is_better = True
             elif abs(error - current_best_error) <= 5.0:
                 if alignment_score > best_metric[1] + 0.1:
                     is_better = True
-            
             if is_better:
                 best_metric = (error, alignment_score)
                 best_H = H
 
     return best_H
 
+
 def _compute_output_canvas_from_aspect_and_bbox_area(geometry_pts: CoordList, coordinates_pts: CoordList) -> Dimensions:
     """
-    Calculate output dimensions. Combines 3D Geometry aspect ratio with a 2D check. 
+    Calculate output dimensions. Combines 3D Geometry aspect ratio with a 2D check.
     """
+    np = get_numpy()
+    cv2 = get_cv2()
+    
     real_width, real_height = _compute_axis_aligned_size_2d(geometry_pts)
     if real_width <= 1e-3 or real_height <= 1e-3:
         target_aspect_ratio = 1.0
@@ -150,7 +155,6 @@ def _compute_output_canvas_from_aspect_and_bbox_area(geometry_pts: CoordList, co
     try:
         img_array = np.array(coordinates_pts, dtype=np.float32)
         _, (vis_w, vis_h), _ = cv2.minAreaRect(img_array)
-        
         vis_w = max(vis_w, 1.0)
         vis_h = max(vis_h, 1.0)
         visual_max_dim = max(vis_w, vis_h)
@@ -159,7 +163,6 @@ def _compute_output_canvas_from_aspect_and_bbox_area(geometry_pts: CoordList, co
             vis_ratio = min(vis_w, vis_h) / max(vis_w, vis_h)
         else:
             vis_ratio = max(vis_w, vis_h) / min(vis_w, vis_h)
-            
     except Exception as e:
         logger.warning(f"Failed to compute visual aspect ratio: {e}")
         visual_max_dim = 512.0
@@ -199,27 +202,25 @@ def _compute_output_canvas_from_aspect_and_bbox_area(geometry_pts: CoordList, co
 
 def _fix_axis_flips_by_src_dst_correlation(H_i2d, H_g2i, H_g2d, plane_quad, W, H):
     """Apply horizontal and vertical flip corrections if needed."""
+    np = get_numpy()
+    
     src_x = (H_g2i @ np.column_stack([plane_quad, np.ones(4)]).T)
     src_x = (src_x[0] / src_x[2]).ravel()
     dst_x = (H_g2d @ np.column_stack([plane_quad, np.ones(4)]).T)
     dst_x = (dst_x[0] / dst_x[2]).ravel()
-    
     corr_x = _safe_corr(src_x, dst_x)
     if corr_x < 0:
         Fh = np.array([[-1,0,W-1],[0,1,0],[0,0,1]], dtype=np.float32)
         H_i2d = Fh @ H_i2d
         logger.info("Applied HORIZONTAL flip (corr_x=%.4f)", float(corr_x))
 
-
     src_y = (H_g2i @ np.column_stack([plane_quad, np.ones(4)]).T)
     src_y = (src_y[1] / src_y[2]).ravel()
     dst_y = (H_g2d @ np.column_stack([plane_quad, np.ones(4)]).T)
     dst_y = (dst_y[1] / dst_y[2]).ravel()
-    
     corr_y = _safe_corr(src_y, dst_y)
     if corr_y < 0:
         Fv = np.array([[1,0,0],[0,-1,H-1],[0,0,1]], dtype=np.float32)
         H_i2d = Fv @ H_i2d
         logger.info("Applied VERTICAL flip (corr_y=%.4f)", float(corr_y))
-    
     return H_i2d

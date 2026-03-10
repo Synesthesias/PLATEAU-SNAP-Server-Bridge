@@ -6,6 +6,7 @@ locals {
       timeout               = 30
       needs_internet_access = false
       description           = "Handles orthographic transformations"
+      architecture          = "arm64"
     },
     "${local.app_name}-roof_extraction" = {
       handler               = "src.roof_extraction.handler.lambda_handler"
@@ -13,6 +14,7 @@ locals {
       timeout               = 30
       needs_internet_access = true # only roof_extraction needs internet access
       description           = "Handles roof extraction from imagery"
+      architecture          = "arm64"
     },
     "${local.app_name}-texture_building" = {
       handler               = "src.texture_building.handler.lambda_handler"
@@ -20,6 +22,7 @@ locals {
       timeout               = 60
       needs_internet_access = false
       description           = "Builds texture for 3d models"
+      architecture          = "arm64"
     }
   }
   export_functions = {
@@ -29,6 +32,7 @@ locals {
       timeout               = 120
       needs_internet_access = false
       description           = "Handles data export to S3"
+      architecture = ["x86_64"]
     },
     "${local.app_name}-export_mesh" = {
       handler               = "PLATEAU.Snap.Server.Lambda::PLATEAU.Snap.Server.Lambda.Function::ExportMesh"
@@ -36,6 +40,7 @@ locals {
       timeout               = 300
       needs_internet_access = false
       description           = "Handles data export to S3"
+      architecture = ["x86_64"]
     }
   }
 }
@@ -49,7 +54,7 @@ resource "aws_lambda_function" "geo_lambdas" {
   for_each = local.functions
 
   function_name = each.key
-  architectures = ["x86_64"]
+  architectures = [lookup(each.value, "architecture", "x86_64")]
   role          = aws_iam_role.lambda_exec_role.arn
   depends_on    = [aws_cloudwatch_log_group.lambda_logs] # logs must exist before lambda deployment
 
