@@ -5,11 +5,11 @@
 ## 1. 概要
 
 本リポジトリでは、2024 ~ 2025 年度の Project PLATEAU で開発した「PLATEAU-SNAP-Server」のソースコードを公開しています。  
-「PLATEAU-SNAP-Server」は、デジタルツインの実現に向けたクラウドソーシング型 3D 都市モデル作成システム (PLATEAU SNAP) のバックエンドサーバーです。
+「PLATEAU-SNAP-Server」は、スマートフォン撮影画像を活用した3D都市モデルへのテクスチャ付与システム (PLATEAU SNAP) のバックエンドサーバーです。
 
 ## 2. 「PLATEAU-SNAP-Server」について
 
-スマートフォンで撮影した画像をもとに 3D 都市モデルの建物地物のテクスチャ(地物の外観)を抽出・生成し、PLATEAU SNAPのデータベースに登録・蓄積可能なツールを開発しました。
+スマートフォンで撮影した画像をもとに 3D 都市モデルの建物物のテクスチャ(地物の外観)を抽出・生成し、PLATEAU SNAPのデータベースに登録・蓄積可能なツールを開発しました。
 
 本システムは、同ツールのバックエンドサーバーとして機能します。
 
@@ -18,9 +18,9 @@
 
 
 各リポジトリの役割は以下の通りです。
-- [PLATEAU-SNAP-App](https://github.com/Synesthesias/PLATEAU-SNAP-App): 画像の撮影・アップロード
-- PLATEAU-SNAP-Server: データの蓄積、画像処理、モデル生成（バックエンド処理）
-- [PLATEAU-SNAP-CMS](https://github.com/Synesthesias/PLATEAU-SNAP-CMS): テクスチャの生成・貼り付け、データベース更新、データ出力
+- [**PLATEAU-SNAP-App**](https://github.com/Synesthesias/PLATEAU-SNAP-App): 画像の撮影・アップロード
+- **PLATEAU-SNAP-Server**: データの蓄積、画像処理、モデル生成（バックエンド処理）
+- [**PLATEAU-SNAP-CMS**](https://github.com/Synesthesias/PLATEAU-SNAP-CMS): テクスチャの生成・貼り付け、データベース更新、データ出力
 
 
 ## 3. 利用手順
