@@ -113,4 +113,4 @@ Web API
 
 ## 10. 参考資料
 
-- [技術検証レポート]([https://xxxx/](https://www.mlit.go.jp/plateau/file/libraries/doc/plateau_tech_doc_0139_ver01.pdf))
+- [技術検証レポート](https://www.mlit.go.jp/plateau/file/libraries/doc/plateau_tech_doc_0139_ver01.pdf)
