@@ -18,14 +18,14 @@
 
 
 各リポジトリの役割は以下の通りです。
-- [**PLATEAU-SNAP-App**](https://github.com/Synesthesias/PLATEAU-SNAP-App): 画像の撮影・アップロード
+- [**PLATEAU-SNAP-App**](https://github.com/Project-PLATEAU/PLATEAU-SNAP-App): 画像の撮影・アップロード
 - **PLATEAU-SNAP-Server**: データの蓄積、画像処理、モデル生成（バックエンド処理）
-- [**PLATEAU-SNAP-CMS**](https://github.com/Synesthesias/PLATEAU-SNAP-CMS): テクスチャの生成・貼り付け、データベース更新、データ出力
+- [**PLATEAU-SNAP-CMS**](https://github.com/Project-PLATEAU/PLATEAU-SNAP-CMS): テクスチャの生成・貼り付け、データベース更新、データ出力
 
 
 ## 3. 利用手順
 
-本システムの構築手順については、[操作マニュアル](https://synesthesias.github.io/PLATEAU-SNAP-Server/)を参照してください。
+本システムの構築手順については、[操作マニュアル](https://project-plateau.github.io/PLATEAU-SNAP-Server/index.html))を参照してください。
 
 ## 4. システム概要
 
