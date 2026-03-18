@@ -74,16 +74,6 @@
       "version": ""
     },
     {
-      "type": "Resource",
-      "source_relative_path": "resources/https.tf",
-      "output": {
-        "resource": {
-          "relative_path": "resources/https.tf"
-        }
-      },
-      "version": ""
-    },
-    {
       "type": "Toc",
       "source_relative_path": "toc.yml",
       "output": {
