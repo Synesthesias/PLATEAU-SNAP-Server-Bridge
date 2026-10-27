@@ -1,5 +1,5 @@
 boto3==1.37.20
-requests==2.31.0
+requests==2.33.0
 opencv-python-headless==4.9.0.80
 numpy==1.26.4
 mercantile==1.2.1
