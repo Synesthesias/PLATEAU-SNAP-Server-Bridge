@@ -1,0 +1,127 @@
+version: 2
+updates:
+- package-ecosystem: docker
+  directories:
+  - /lambdas
+  - /src/PLATEAU.Snap.Server
+  - /src/PLATEAU.Snap.Server.Lambda
+  schedule:
+    interval: weekly
+    day: monday
+    time: '10:00'
+    timezone: Asia/Tokyo
+  open-pull-requests-limit: 3
+  groups:
+    routine-updates:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    security-updates:
+      applies-to: security-updates
+      patterns:
+      - '*'
+- package-ecosystem: docker-compose
+  directory: /src
+  schedule:
+    interval: weekly
+    day: monday
+    time: '10:00'
+    timezone: Asia/Tokyo
+  open-pull-requests-limit: 3
+  groups:
+    routine-updates:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    security-updates:
+      applies-to: security-updates
+      patterns:
+      - '*'
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: '10:00'
+    timezone: Asia/Tokyo
+  open-pull-requests-limit: 3
+  groups:
+    routine-updates:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    security-updates:
+      applies-to: security-updates
+      patterns:
+      - '*'
+- package-ecosystem: nuget
+  directories:
+  - /src/PLATEAU.Snap.Models
+  - /src/PLATEAU.Snap.Server
+  - /src/PLATEAU.Snap.Server.Entities
+  - /src/PLATEAU.Snap.Server.Lambda
+  - /src/PLATEAU.Snap.Server.Repositories.PostgreSQL
+  - /src/PLATEAU.Snap.Server.Repositories.S3
+  - /src/PLATEAU.Snap.Server.Services.Impl
+  - /src/PLATEAU.Snap.Server.Test
+  schedule:
+    interval: weekly
+    day: monday
+    time: '10:00'
+    timezone: Asia/Tokyo
+  open-pull-requests-limit: 3
+  groups:
+    routine-updates:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    security-updates:
+      applies-to: security-updates
+      patterns:
+      - '*'
+- package-ecosystem: pip
+  directory: /lambdas
+  schedule:
+    interval: weekly
+    day: monday
+    time: '10:00'
+    timezone: Asia/Tokyo
+  open-pull-requests-limit: 3
+  groups:
+    routine-updates:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    security-updates:
+      applies-to: security-updates
+      patterns:
+      - '*'
+- package-ecosystem: terraform
+  directory: /terraform/environments/dev
+  schedule:
+    interval: weekly
+    day: monday
+    time: '10:00'
+    timezone: Asia/Tokyo
+  open-pull-requests-limit: 3
+  groups:
+    routine-updates:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    security-updates:
+      applies-to: security-updates
+      patterns:
+      - '*'
